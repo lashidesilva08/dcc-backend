@@ -1,38 +1,23 @@
 import { createClient } from 'redis';
 
-// Initialize the client
-const client = createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
+const redisClient = createClient({
+  url: process.env.REDIS_URL || 'redis://localhost:6379'
 });
 
-// Event listeners for health monitoring
-client.on('error', (err) => console.error('❌ Redis Client Error:', err));
-client.on('connect', () => console.log('✅ Redis Client Connected'));
+redisClient.on('error', (err) => {
+  console.error('Redis error:', err);
+});
 
-/**
- * Ensures the Redis connection is established.
- * You'll call this in your main entry file.
- */
+redisClient.on('connect', () => {
+  console.log('Redis connected');
+});
+
 export const connectRedis = async () => {
-    try {
-        if (!client.isOpen) {
-            await client.connect();
-        }
-    } catch (error) {
-        console.error('Could not connect to Redis:', error);
-    }
+  await redisClient.connect();
 };
 
 export const disconnectRedis = async () => {
-    try {
-        if (client.isOpen) {
-            await client.disconnect();
-            console.log('🛑 Redis Client Disconnected');
-        }
-    } catch (error) {
-        console.error('Error during Redis disconnection:', error);
-    }
+  await redisClient.disconnect();
 };
 
-// Export the client instance as a named export
-export { client };
+export default redisClient;
