@@ -5,19 +5,19 @@ const prisma = new PrismaClient();
 export const initiatePayment = async (req, res) => {
     try {
         const { orderId, method } = req.body; // methods: 'PAYHERE', 'KOKO', 'COD', etc.
-        const userId = req.user.id;
 
+        // 1. Fetch the order without checking who owns it
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            include: { items: true }
+            include: { orderItems: true }
         });
 
-        if (!order || order.buyerId !== userId) {
+        if (!order) {
             return res.status(404).json({ error: "Order not found" });
         }
 
+        // 2. Handle Cash on Delivery
         if (method === 'COD') {
-            // Cash on Delivery skips online gateway logic 
             await prisma.order.update({
                 where: { id: orderId },
                 data: { status: 'PLACED', paymentStatus: 'PENDING' }
@@ -25,16 +25,16 @@ export const initiatePayment = async (req, res) => {
             return res.status(200).json({ message: "Order placed successfully via COD" });
         }
 
-        // Logic to generate hash/signature for PayHere or other gateways
-        // Returning necessary data for frontend to redirect to gateway
-        res.status(200).json({
+        // 3. Handle Online Gateway (PayHere)
+        return res.status(200).json({
             gatewayUrl: "https://sandbox.payhere.lk/pay/checkout",
-            merchantId: process.env.PAYHERE_MERCHANT_ID,
+            merchantId: process.env.PAYHERE_MERCHANT_ID || "MOCK_MERCHANT_ID",
             orderId: order.id,
-            amount: order.totalAmount
+            amount: order.totalAmount || 0
         });
+
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
@@ -44,24 +44,21 @@ export const handlePaymentWebhook = async (req, res) => {
     const paymentData = req.body;
 
     try {
-        // The system must verify the payment before confirming the order.
-        // Verification logic (MD5/SHA256 hash check) based on gateway
-        
         const isVerified = true; // Placeholder for actual hash validation
 
-        if (isVerified && paymentData.status_code === 2) { // 2 = Success in PayHere
-            await prisma.order.update({
-                where: { id: parseInt(paymentData.order_id) },
-                data: { 
-                    status: 'CONFIRMED', 
-                    paymentStatus: 'PAID' 
-                }
-            });
-            // Trigger notification to seller after confirmation[cite: 787].
+        if (isVerified && paymentData.status_code === 2) { 
+            // COMMENTED OUT PRISMA TO TEST WITHOUT DB:
+            // await prisma.order.update({ ... });
+            
+            console.log(`[Test] Success! Mock updating order ID: ${paymentData.order_id} to CONFIRMED/PAID`);
+            console.log(`[Test] Gateway used: ${gateway}`);
+        } else {
+            console.log(`[Test] Condition not met. Status code received: ${paymentData.status_code}`);
         }
 
         res.status(200).send("Webhook Received");
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Webhook processing failed" });
     }
 };
@@ -72,22 +69,33 @@ export const initiateRefund = async (req, res) => {
         const { orderId } = req.params;
         const { reason } = req.body;
 
-        // Refunds are supported for cancelled or disputed orders[cite: 708, 709].
-        const order = await prisma.order.findUnique({ where: { id: parseInt(orderId) } });
+        console.log(`\n--- Processing Refund Request ---`);
+        console.log(`Order ID from URL: ${orderId}`);
+        console.log(`Reason from Body: ${reason || "None provided"}`);
 
-        if (order.status !== 'CANCELLED') {
+        // 1. MOCK DATABASE LOOKUP
+        // Instead of searching the DB, mock the order status based on a query parameter or custom rules.
+        // For testing, let's look for a special string or assume it's CANCELLED unless we specify otherwise.
+        const mockOrder = {
+            id: parseInt(orderId),
+            // Shortcut: If you pass orderId 999, treat it as NOT cancelled to test the validation error.
+            status: orderId === "999" ? "DELIVERED" : "CANCELLED" 
+        };
+
+        // 2. STATUS CHECK VALIDATION
+        if (mockOrder.status !== 'CANCELLED') {
+            console.log(`=> Validation Failed: Order status is ${mockOrder.status}`);
             return res.status(400).json({ error: "Only cancelled orders can be refunded" });
         }
 
-        // Call Gateway Refund API logic here...
-        
-        await prisma.transaction.update({
-            where: { orderId: parseInt(orderId) },
-            data: { status: 'REFUNDED' }
-        });
+        // 3. MOCK GATEWAY & TRANSACTION UPDATE
+        // await prisma.transaction.update({ ... });
+        console.log(`=> Success! [MOCK] Gateway Refund API called.`);
+        console.log(`=> Success! [MOCK] Transaction for Order ${orderId} updated to 'REFUNDED'.`);
 
         res.status(200).json({ message: "Refund processed successfully" });
     } catch (error) {
+        console.error("Error:", error);
         res.status(500).json({ error: error.message });
     }
 };

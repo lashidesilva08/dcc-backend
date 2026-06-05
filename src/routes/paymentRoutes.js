@@ -5,6 +5,6 @@ const router = express.Router();
 
 router.post("/initiate", initiatePayment);
 router.post("/webhook", handlePaymentWebhook);
-router.post("/refund", initiateRefund);
+router.post("/refund/:orderId", initiateRefund);
 
 export default router;
