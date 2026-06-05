@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String
+  phone     String?
+  verified  Boolean  @default(false)
+
+  seller    Seller?
+  reviews   Review[]
+  orders    Order[]
+
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Seller {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  shopName      String
+  shopUrl       String?  @unique
+  businessType  String
+  status        String   @default("pending")
+  commissionRate Float   @default(10.0)
+
+  user      User       @relation(fields: [userId], references: [id])
+  listings  Listing[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  icon      String?
+  status    String   @default("active")
+
+  listings  Listing[]
+
+  createdAt DateTime @default(now())
+}
+
+model Listing {
+  id          Int      @id @default(autoincrement())
+  sellerId    Int
+  categoryId  Int
+  title       String
+  description String
+  price       Float
+  stock       Int?
+  status      String   @default("active")
+
+  seller    Seller   @relation(fields: [sellerId], references: [id])
+  category  Category @relation(fields: [categoryId], references: [id])
+  reviews   Review[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+
+  userId    Int
+  listingId Int
+
+  user      User     @relation(fields: [userId], references: [id])
+  listing   Listing  @relation(fields: [listingId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+
+model Order {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  orderNumber     String        @unique
+  totalAmount     Float
+  deliveryFee     Float         @default(0)
+  paymentMethod   String
+  paymentStatus   String        @default("pending")
+  orderStatus     String        @default("placed")
+  deliveryAddress String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id])
+  orderItems      OrderItem[]
+  transactions    Transaction?
+  delivery        Delivery?
+}
+
+model OrderItem {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  listingId  Int
+  sellerId   Int
+  quantity   Int
+  unitPrice  Float
+  subtotal   Float
+  itemStatus String   @default("placed")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  order      Order    @relation(fields: [orderId], references: [id])
+  listing    Listing  @relation(fields: [listingId], references: [id])
+  seller     Seller   @relation(fields: [sellerId], references: [id])
+}
+
+model Transaction {
+  id                   Int       @id @default(autoincrement())
+  orderId              Int       @unique
+  transactionReference String    @unique
+  paymentGateway       String
+  amount               Float
+  currency             String    @default("LKR")
+  status               String    @default("pending")
+  gatewayResponse      Json?
+  paidAt               DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  order                Order     @relation(fields: [orderId], references: [id])
+}
+
+model DeliveryProvider {
+  id            Int        @id @default(autoincrement())
+  providerName  String
+  contactPerson String
+  email         String     @unique
+  phone         String
+  serviceArea   String
+  baseFee       Float
+  status        String     @default("pending")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  deliveries    Delivery[]
+}
+
+model Delivery {
+  id                 Int               @id @default(autoincrement())
+  orderId            Int               @unique
+  deliveryProviderId Int?
+  trackingNumber     String?            @unique
+  pickupAddress      String
+  deliveryAddress    String
+  deliveryStatus     String            @default("pending")
+  assignedAt         DateTime?
+  pickedUpAt         DateTime?
+  deliveredAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  order              Order             @relation(fields: [orderId], references: [id])
+  deliveryProvider   DeliveryProvider? @relation(fields: [deliveryProviderId], references: [id])
+}

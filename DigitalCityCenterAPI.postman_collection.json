@@ -1,0 +1,1392 @@
+{
+  "info": {
+    "_postman_id": "7e3ce7ce-5b40-4bc6-93ec-8460a2b4841f",
+    "name": "DigitalCityCenterAPI",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "47644380",
+    "_collection_link": "https://go.postman.co/collection/47644380-7e3ce7ce-5b40-4bc6-93ec-8460a2b4841f?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "products",
+      "item": [
+        {
+          "name": "Create a Product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Summer T-Shirt\",\r\n \"price\": 1500,\r\n\"category\": \"Fashion\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get product detail",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\":\"Lashika\",\r\n    \"email\":\"lashi@gmail.com\",\r\n    \"password\":\"abc\"\r\n}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/:id",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product List",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\":\"Lashika\",\r\n    \"email\":\"lashi@gmail.com\",\r\n    \"password\":\"abc\"\r\n}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Categories",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"name\":\"Lashika\",\r\n    \"email\":\"lashi@gmail.com\",\r\n    \"password\":\"abc\"\r\n}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/categories",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"price\": 1200}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/123",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                "123"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"productId\": \"123\", \"rating\": 5, \"comment\": \"Great!\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/products/reviews",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "products",
+                "reviews"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "item": [
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"status\":\"Dispatched\"\r\n\r\n    \r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/orders/:id/status?id=5675765",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "orders",
+                ":id",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "5675765",
+                  "type": "text"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+    
+        {
+          "name": "Buyer Order History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BaseURL}}/orders/my-orders",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "orders",
+                "my-orders"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"items\":\"T-shirt\",\r\n    \"paymentMethod\":\"OnePay\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/orders/checkout",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "orders",
+                "checkout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "Checkout",
+            "request": {
+             "method": "POST",
+            "header": [],
+            "body": {
+            "mode": "raw",
+                "raw": "{ \"paymentMethod\": \"CARD\" }"
+            },
+            "url": {
+            "raw": "{{BaseURL}}/orders/checkout",
+            "host": ["{{BaseURL}}"],
+            "path": ["orders", "checkout"]
+            }
+        }
+        },
+        {
+        "name": "Get My Orders",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+            "raw": "{{BaseURL}}/orders",
+            "host": ["{{BaseURL}}"],
+            "path": ["orders"]
+            }
+        }
+        },
+        {
+        "name": "Get Order By ID",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+            "raw": "{{BaseURL}}/orders/:id",
+            "host": ["{{BaseURL}}"],
+            "path": ["orders", ":id"],
+            "variable": [{ "key": "id", "value": "" }]
+            }
+        }
+        },
+        {
+        "name": "Cancel Order",
+        "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+            "raw": "{{BaseURL}}/orders/:id/cancel",
+            "host": ["{{BaseURL}}"],
+            "path": ["orders", ":id", "cancel"],
+            "variable": [{ "key": "id", "value": "" }]
+            }
+        }
+        },
+        {
+        "name": "Track Order",
+        "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+            "raw": "{{BaseURL}}/orders/:id/tracking",
+            "host": ["{{BaseURL}}"],
+            "path": ["orders", ":id", "tracking"],
+            "variable": [{ "key": "id", "value": "" }]
+            }
+        }
+        }
+      ]
+    },
+
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n   \"name\": \"John\", \r\n   \"email\": \"test@test.com\",\r\n    \"password\": \"123\", \r\n    \"role\": \"BUYER\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/auth/register",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"test@test.com\",\r\n  \"password\": \"123\"\r\n }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/auth/login",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"test@test.com\"\r\n }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/auth/forgot-password",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "reset-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\": \"xyz123\", \"newPassword\": \"newpassword123\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/auth/reset-password",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "google-auth",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                "mode": "raw",
+                "raw": "{ \"tokenId\": \"google_token_here\" }"
+                },
+                "url": {
+                "raw": "{{BaseURL}}/auth/google",
+                "host": ["{{BaseURL}}"],
+                "path": ["auth", "google"]
+                }
+            }
+            },
+            {
+            "name": "logout",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/auth/logout",
+                "host": ["{{BaseURL}}"],
+                "path": ["auth", "logout"]
+                }
+            }
+            },
+            {
+            "name": "verify-email",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                "mode": "raw",
+                "raw": "{ \"token\": \"email_token_here\" }"
+                },
+                "url": {
+                "raw": "{{BaseURL}}/auth/verify-email",
+                "host": ["{{BaseURL}}"],
+                "path": ["auth", "verify-email"]
+                }
+            }
+            }
+      ]
+    },
+    {
+      "name": "cart",
+      "item": [
+        {
+          "name": "View Cart",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Summer T-Shirt\",\r\n \"price\": 1500,\r\n\"category\": \"Fashion\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/cart",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "cart"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "Get Cart",
+            "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+            "raw": "{{BaseURL}}/cart",
+            "host": ["{{BaseURL}}"],
+            "path": ["cart"]
+            }
+        }
+
+                },
+        {
+             "name": "Update Cart Item",
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                "mode": "raw",
+                "raw": "{ \"quantity\": 3 }"
+                },
+                "url": {
+                "raw": "{{BaseURL}}/cart/:id",
+                "host": ["{{BaseURL}}"],
+                "path": ["cart", ":id"],
+                "variable": [{ "key": "id", "value": "" }]
+                }
+  }
+        },
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"productId\": \"p101\", \"quantity\": 2}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/cart/add",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "cart",
+                "add"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove from Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"productId\": \"p101\", \"quantity\": 2}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/cart/c1",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "cart",
+                "c1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "Clear Cart",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/cart/clear",
+                "host": [
+                    "{{BaseURL}}"
+                ],
+                "path": [
+                    "cart",
+                    "clear"
+                ]
+                }
+            },
+            "response": []
+        }
+      ]
+    },
+    {
+      "name": "wishlist",
+      "item": [
+        {
+          "name": "View Wishlist",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Summer T-Shirt\",\r\n \"price\": 1500,\r\n\"category\": \"Fashion\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/wishlist",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "wishlist"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add to Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"productId\": \"p202\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/wishlist/add",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "wishlist",
+                "add"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "payments",
+      "item": [
+        {
+          "name": "Inititate Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"gateway\": \"Koko\", \"amount\": 5000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/payments/initiate",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "payments",
+                "initiate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"gateway\": \"Koko\", \"amount\": 5000}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/payments/webhook",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "payments",
+                "webhook"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refund",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "admin",
+      "item": [
+        {
+          "name": "View Pending Sellers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BaseURL}}/admin/sellers/pending",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "admin",
+                "sellers",
+                "pending"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve a Seller",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"APPROVED\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/admin/sellers/:id/approve",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "admin",
+                "sellers",
+                ":id",
+                "approve"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "View Seller Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BaseURL}}/admin/reports/sales",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "admin",
+                "reports",
+                "sales"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+  "name": "admin",
+  "item": [
+    {
+      "name": "Get Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BaseURL}}/admin/dashboard",
+          "host": ["{{BaseURL}}"],
+          "path": ["admin", "dashboard"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Approve Seller",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"status\": \"APPROVED\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{BaseURL}}/admin/seller/:id/approve",
+          "host": ["{{BaseURL}}"],
+          "path": ["admin", "seller", ":id", "approve"],
+          "variable": [
+            {
+              "key": "id",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Reject Seller",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": {
+          "raw": "{{BaseURL}}/admin/seller/:id/reject",
+          "host": ["{{BaseURL}}"],
+          "path": ["admin", "seller", ":id", "reject"],
+          "variable": [
+            {
+              "key": "id",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Suspend Seller",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": {
+          "raw": "{{BaseURL}}/admin/seller/:id/suspend",
+          "host": ["{{BaseURL}}"],
+          "path": ["admin", "seller", ":id", "suspend"],
+          "variable": [
+            {
+              "key": "id",
+              "value": ""
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BaseURL}}/admin/orders",
+          "host": ["{{BaseURL}}"],
+          "path": ["admin", "orders"]
+        }
+      },
+      "response": []
+    }
+  ]
+},
+        {
+          "name": "View Disputes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BaseURL}}/admin/disputes",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "admin",
+                "disputes"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "item": [
+        {
+          "name": "View User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BaseURL}}/users/profile",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "users",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"oldPassword\": \"123\", \"newPassword\": \"456\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/users/change-password",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "users",
+                "change-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "shop",
+      "item": [
+        {
+          "name": "Create shop",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"shopName\": \"My Store\", \"description\": \"High quality goods\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/shops/",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "shops",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "View Analytics",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"shopName\": \"My Store\", \"description\": \"High quality goods\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/shops/my-shop/analytics",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "shops",
+                "my-shop",
+                "analytics"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "services",
+      "item": [
+        {
+          "name": "Book Service",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"serviceId\": \"s1\", \"date\": \"2024-06-01\", \"time\": \"10:00 AM\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/services/book",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "services",
+                "book"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Status Update",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"CANCELLED\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/services/booking/b123",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "services",
+                "booking",
+                "b123"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "search",
+      "item": [
+        {
+          "name": "View suggestions",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"shopName\": \"My Store\", \"description\": \"High quality goods\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/search/suggestions?q=elec",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "search",
+                "suggestions"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "elec"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "item": [
+        {
+          "name": "View Notifications",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"shopName\": \"My Store\", \"description\": \"High quality goods\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/notifications/",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "notifications",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "Mark All Read",
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/notifications/read-all",
+                "host": ["{{BaseURL}}"],
+                "path": ["notifications", "read-all"]
+                }
+            }
+        },
+        {
+            "name": "Delete Notification",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/notifications/:id",
+                "host": ["{{BaseURL}}"],
+                "path": ["notifications", ":id"],
+                "variable": [{ "key": "id", "value": "" }]
+                }
+  }
+        },
+        {
+          "name": "Mark as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"CANCELLED\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/notifications/:id/read",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "notifications",
+                ":id",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "delivery",
+      "item": [
+        {
+          "name": "View Assigned Deliveries",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"shopName\": \"My Store\", \"description\": \"High quality goods\"}"
+            },
+            "url": {
+              "raw": "{{BaseURL}}/delivery/assigned",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "delivery",
+                "assigned"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+            "name": "Register Delivery Provider",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/delivery/register",
+                "host": ["{{BaseURL}}"],
+                "path": ["delivery", "register"]
+                }
+  }
+        },
+        
+        {
+            "name": "Accept Job",
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/delivery/jobs/:id/accept",
+                "host": ["{{BaseURL}}"],
+                "path": ["delivery", "jobs", ":id", "accept"],
+                "variable": [{ "key": "id", "value": "" }]
+                }
+            }
+        },
+        {
+             "name": "Pickup Order",
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                "raw": "{{BaseURL}}/delivery/jobs/:id/pickup",
+                "host": ["{{BaseURL}}"],
+                "path": ["delivery", "jobs", ":id", "pickup"],
+                "variable": [{ "key": "id", "value": "" }]
+                }
+  }
+        },
+        {
+             "name": "Mark Delivered",
+                "request": {
+                    "method": "PUT",
+                    "header": [],
+                    "url": {
+                    "raw": "{{BaseURL}}/delivery/jobs/:id/delivered",
+                    "host": ["{{BaseURL}}"],
+                    "path": ["delivery", "jobs", ":id", "delivered"],
+                    "variable": [{ "key": "id", "value": "" }]
+                    }
+                }
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BaseURL}}/delivery/:id/track",
+              "host": [
+                "{{BaseURL}}"
+              ],
+              "path": [
+                "delivery",
+                ":id",
+                "track"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Test request",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{BaseURL}}/orders/",
+          "host": [
+            "{{BaseURL}}"
+          ],
+          "path": [
+            "orders",
+            ""
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BaseURL",
+      "value": ""
+    }
+  ]
+}
