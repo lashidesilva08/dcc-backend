@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.0.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -24,7 +25,9 @@
     "redis": "^6.0.0"
   },
   "devDependencies": {
-    "@prisma/client": "^6.0.0",
     "prisma": "^6.0.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
