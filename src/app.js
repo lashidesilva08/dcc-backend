@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
@@ -14,8 +15,6 @@ import shopRoutes from "./routes/shopRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
-
-
 
 const app = express();
 
@@ -33,9 +32,13 @@ app.use(cors({
 app.use(express.urlencoded({extended:true}))
 
 
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+
 app.get("/", (req, res) => {
   res.json({ message: "Digital City Center Backend is running!", status: "active" });
 });
+
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);

@@ -67,6 +67,7 @@ model Listing {
   category  Category @relation(fields: [categoryId], references: [id])
   reviews   Review[]
   orderItems OrderItem[]
+  images      ProductImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -171,4 +172,15 @@ model Delivery {
 
   order              Order             @relation(fields: [orderId], references: [id])
   deliveryProvider   DeliveryProvider? @relation(fields: [deliveryProviderId], references: [id])
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  listingId Int
+  url       String   
+  isMain    Boolean  @default(false) // Useful to flag which image shows up first
+
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
