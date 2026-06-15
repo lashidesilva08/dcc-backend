@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js"
 import wishlistRoutes from "./routes/wishlistRoutes.js"
@@ -15,18 +16,33 @@ import serviceRoutes from "./routes/serviceRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 
-
-
 const app = express();
 
 app.use(express.json());
-app.use(cors())
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman) or any localhost origin
+    if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.urlencoded({extended:true}))
+
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+
+app.get("/", (req, res) => {
+  res.json({ message: "Digital City Center Backend is running!", status: "active" });
+});
+
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/wishlist", wishlistRoutes);
