@@ -62,7 +62,6 @@ async function main() {
     categoriesMap[cat.slug] = created.id;
   }
 
-  // Define the missing mock data array here
   const listings = [
     // Electronics
     { slug: 'electronics', title: 'WH-1000XM5 Wireless Headphones', desc: 'SONY - Industry leading noise canceling wireless headphones.', price: 97750, img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500' },
@@ -128,35 +127,86 @@ async function main() {
   for (const item of listings) {
     const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 
-    // 1. Define category-specific color & size combinations
+    // 1. Define category-specific color & size variants along with unique images
     let variantDefinitions = [];
 
     if (item.slug === 'fashion') {
       variantDefinitions = [
-        { suffix: 'BLK-S', attrs: { Color: 'Black', Size: 'S' }, stock: 15 },
-        { suffix: 'BLK-M', attrs: { Color: 'Black', Size: 'M' }, stock: 25 },
-        { suffix: 'WHT-M', attrs: { Color: 'White', Size: 'M' }, stock: 20 },
-        { suffix: 'WHT-L', attrs: { Color: 'White', Size: 'L' }, stock: 10 },
+        { 
+          suffix: 'BLK-S', 
+          attrs: { Color: 'Black', Size: 'S' }, 
+          stock: 15, 
+          variantImg: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500' // Darker/Black clothing profile
+        },
+        { 
+          suffix: 'BLK-M', 
+          attrs: { Color: 'Black', Size: 'M' }, 
+          stock: 25, 
+          variantImg: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500' 
+        },
+        { 
+          suffix: 'WHT-M', 
+          attrs: { Color: 'White', Size: 'M' }, 
+          stock: 20, 
+          variantImg: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=500' // Plain white folded layout
+        },
+        { 
+          suffix: 'WHT-L', 
+          attrs: { Color: 'White', Size: 'L' }, 
+          stock: 10, 
+          variantImg: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=500' 
+        },
       ];
     } else if (item.slug === 'electronics') {
       const isDevice = item.title.includes('Galaxy') || item.title.includes('MacBook');
       variantDefinitions = [
-        { suffix: 'SLV', attrs: { Color: 'Silver', Size: isDevice ? '256GB' : 'Standard' }, stock: 30 },
-        { suffix: 'GPH', attrs: { Color: 'Graphite', Size: isDevice ? '512GB' : 'Standard' }, stock: 20 }
+        { 
+          suffix: 'SLV', 
+          attrs: { Color: 'Silver', Size: isDevice ? '256GB' : 'Standard' }, 
+          stock: 30,
+          variantImg: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500' // Silver premium finish layout
+        },
+        { 
+          suffix: 'GPH', 
+          attrs: { Color: 'Graphite', Size: isDevice ? '512GB' : 'Standard' }, 
+          stock: 20,
+          variantImg: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500' // Slate dark profile image
+        }
       ];
     } else if (item.slug === 'home') {
       variantDefinitions = [
-        { suffix: 'GY-QN', attrs: { Color: 'Slate Gray', Size: 'Queen' }, stock: 15 },
-        { suffix: 'GY-KG', attrs: { Color: 'Slate Gray', Size: 'King' }, stock: 12 },
-        { suffix: 'NV-QN', attrs: { Color: 'Navy Blue', Size: 'Queen' }, stock: 18 }
+        { 
+          suffix: 'GY-QN', 
+          attrs: { Color: 'Slate Gray', Size: 'Queen' }, 
+          stock: 15,
+          variantImg: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=500' // Dark Gray bed setup
+        },
+        { 
+          suffix: 'GY-KG', 
+          attrs: { Color: 'Slate Gray', Size: 'King' }, 
+          stock: 12,
+          variantImg: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=500' 
+        },
+        { 
+          suffix: 'NV-QN', 
+          attrs: { Color: 'Navy Blue', Size: 'Queen' }, 
+          stock: 18,
+          variantImg: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=500' // Rich Blue tone bedroom arrangement
+        }
       ];
     } else {
+      // Default fallback handles Groceries, Beauty, Sports, Kids
       variantDefinitions = [
-        { suffix: 'STD', attrs: { Color: 'Default', Size: 'Standard' }, stock: 50 }
+        { 
+          suffix: 'STD', 
+          attrs: { Color: 'Default', Size: 'Standard' }, 
+          stock: 50,
+          variantImg: item.img // Uses the original image matching the generic list item
+        }
       ];
     }
 
-    // 2. Map definitions to the Prisma variants format
+    // 2. Map definitions directly to the schema specifications
     const variantsToCreate = variantDefinitions.map((v) => ({
       sku: `${cleanSku}-${v.suffix}`,
       price: item.price,
@@ -166,14 +216,14 @@ async function main() {
       images: {
         create: [
           {
-            url: item.img,
+            url: v.variantImg || item.img, // Correctly pins image records down into individual nested variant records!
             isMain: true
           }
         ]
       }
     }));
 
-    // 3. Create the listing in your database
+    // 3. Construct listing entry
     await prisma.listing.create({
       data: {
         sellerId: seller.id,
@@ -188,7 +238,7 @@ async function main() {
     });
   }
 
-  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with realistic variant attributes.`);
+  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with individual variant image mappings successfully.`);
 }
 
 main()
