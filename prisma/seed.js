@@ -11,6 +11,7 @@ async function main() {
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.review.deleteMany();
+  await prisma.productVariant.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.category.deleteMany();
   await prisma.seller.deleteMany();
@@ -63,7 +64,7 @@ async function main() {
     categoriesMap[cat.slug] = created.id;
   }
 
-console.log('Seeding listings with images...');
+console.log('Seeding listings with product variants and images...');
 
   const listings = [
     // Electronics
@@ -114,11 +115,11 @@ console.log('Seeding listings with images...');
     { slug: 'sports',      title: 'English Willow Cricket Bat',         desc: 'SS - Professional English willow cricket bat.',                price: 15990, img: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=500' },
     { slug: 'sports',      title: 'Strike Football Size 5',             desc: 'NIKE - FIFA quality mark match football.',                     price: 5990, img: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=500' },
     { slug: 'sports',      title: 'Training Gym Bag 50L',               desc: 'ADIDAS - Durable gym bag with multiple compartments.',         price: 8990, img: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500' },
-    { slug: 'sports',      title: 'Insulated Sports Water Bottle 750ml', desc: 'WILSON - Keeps drinks cold for 24 hours.',                   price: 2490, img: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500' },
+    { slug: 'sports',      title: 'Insulated Sports Water Bottle 750ml', desc: 'WILSON - Keeps drinks cold for 24 hours.',                   price: 2499, img: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500' },
     
     // Kids
-    { slug: 'kids',        title: 'Creative Building Blocks Set',       desc: 'LEGO - 450-piece creative building toy set for kids.',        price: 8990, img: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=500' },
-    { slug: 'kids',        title: 'Plush Teddy Bear Large',             desc: 'SOFT TOYS - Ultra soft and cuddly plush teddy bear.',         price: 3490, img: 'https://images.unsplash.com/photo-1559251606-c623743a6d76?w=500' },
+    { slug: 'kids',        title: 'Creative Building Blocks Set',        desc: 'LEGO - 450-piece creative building toy set for kids.',        price: 8990, img: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=500' },
+    { slug: 'kids',        title: 'Plush Teddy Bear Large',              desc: 'SOFT TOYS - Ultra soft and cuddly plush teddy bear.',          price: 3490, img: 'https://images.unsplash.com/photo-1559251606-c623743a6d76?w=500' },
     { slug: 'kids',        title: 'Kids 3-Wheel Scooter',               desc: 'MICRO - Foldable 3-wheel scooter for ages 3–8.',              price: 12990, img: 'https://images.unsplash.com/photo-1597200381847-30ec200eeb9a?w=500' },
     { slug: 'kids',        title: 'Story Book Bundle (5)',               desc: 'SCHOLASTIC - Five classic illustrated story books.',          price: 2990, img: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=500' },
     { slug: 'kids',        title: 'Ultimate Art & Craft Kit',            desc: 'CRAYOLA - Complete art kit with crayons, paint, and more.',   price: 5490, img: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500' },
@@ -126,20 +127,32 @@ console.log('Seeding listings with images...');
   ];
 
   for (const item of listings) {
+    // Generate a quick mockup clean SKU based on product title
+    const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+
     await prisma.listing.create({
       data: {
         sellerId: seller.id,
         categoryId: categoriesMap[item.slug],
         title: item.title,
         description: item.desc,
-        price: item.price,
-        stock: 50,
         status: 'active',
-        images: {
+        variants: {
           create: [
             {
-              url: item.img,
-              isMain: true
+              sku: `${cleanSku}-STD`,
+              price: item.price,
+              stock: 50,
+              status: 'active',
+              attributes: { type: 'Standard' }, // 👈 Complies with Postgres JSON format requirement
+              images: {
+                create: [
+                  {
+                    url: item.img,
+                    isMain: true
+                  }
+                ]
+              }
             }
           ]
         }
@@ -147,7 +160,7 @@ console.log('Seeding listings with images...');
     });
   }
 
-  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings.`);
+  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with variants and images successfully.`);
 }
 
 main()
