@@ -44,11 +44,9 @@ async function main() {
   });
 
   console.log('Seeding categories...');
-  // NOTE: Names chosen so that nameToSlug() produces slugs that match
-  // the existing frontend routes: /category/electronics, /category/fashion, etc.
   const categoriesData = [
     { name: 'Electronics',   icon: 'Laptop',      slug: 'electronics' },
-    { name: 'Fashion',       icon: 'Shirt',        slug: 'fashion' },
+    { name: 'Fashion',       icon: 'Shirt',       slug: 'fashion' },
     { name: 'Groceries',     icon: 'ShoppingBag',  slug: 'groceries' },
     { name: 'Home',          icon: 'Home',         slug: 'home' },
     { name: 'Beauty',        icon: 'Sparkles',     slug: 'beauty' },
@@ -64,8 +62,7 @@ async function main() {
     categoriesMap[cat.slug] = created.id;
   }
 
-console.log('Seeding listings with product variants and images...');
-
+  // Define the missing mock data array here
   const listings = [
     // Electronics
     { slug: 'electronics', title: 'WH-1000XM5 Wireless Headphones', desc: 'SONY - Industry leading noise canceling wireless headphones.', price: 97750, img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500' },
@@ -126,10 +123,57 @@ console.log('Seeding listings with product variants and images...');
     { slug: 'kids',        title: 'World Map Jigsaw Puzzle 100pc',      desc: 'RAVENSBURGER - Educational world map jigsaw puzzle.',          price: 3990, img: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=500' },
   ];
 
+  console.log('Seeding listings with product variants and images...');
+
   for (const item of listings) {
-    // Generate a quick mockup clean SKU based on product title
     const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 
+    // 1. Define category-specific color & size combinations
+    let variantDefinitions = [];
+
+    if (item.slug === 'fashion') {
+      variantDefinitions = [
+        { suffix: 'BLK-S', attrs: { Color: 'Black', Size: 'S' }, stock: 15 },
+        { suffix: 'BLK-M', attrs: { Color: 'Black', Size: 'M' }, stock: 25 },
+        { suffix: 'WHT-M', attrs: { Color: 'White', Size: 'M' }, stock: 20 },
+        { suffix: 'WHT-L', attrs: { Color: 'White', Size: 'L' }, stock: 10 },
+      ];
+    } else if (item.slug === 'electronics') {
+      const isDevice = item.title.includes('Galaxy') || item.title.includes('MacBook');
+      variantDefinitions = [
+        { suffix: 'SLV', attrs: { Color: 'Silver', Size: isDevice ? '256GB' : 'Standard' }, stock: 30 },
+        { suffix: 'GPH', attrs: { Color: 'Graphite', Size: isDevice ? '512GB' : 'Standard' }, stock: 20 }
+      ];
+    } else if (item.slug === 'home') {
+      variantDefinitions = [
+        { suffix: 'GY-QN', attrs: { Color: 'Slate Gray', Size: 'Queen' }, stock: 15 },
+        { suffix: 'GY-KG', attrs: { Color: 'Slate Gray', Size: 'King' }, stock: 12 },
+        { suffix: 'NV-QN', attrs: { Color: 'Navy Blue', Size: 'Queen' }, stock: 18 }
+      ];
+    } else {
+      variantDefinitions = [
+        { suffix: 'STD', attrs: { Color: 'Default', Size: 'Standard' }, stock: 50 }
+      ];
+    }
+
+    // 2. Map definitions to the Prisma variants format
+    const variantsToCreate = variantDefinitions.map((v) => ({
+      sku: `${cleanSku}-${v.suffix}`,
+      price: item.price,
+      stock: v.stock,
+      status: 'active',
+      attributes: v.attrs,
+      images: {
+        create: [
+          {
+            url: item.img,
+            isMain: true
+          }
+        ]
+      }
+    }));
+
+    // 3. Create the listing in your database
     await prisma.listing.create({
       data: {
         sellerId: seller.id,
@@ -138,29 +182,13 @@ console.log('Seeding listings with product variants and images...');
         description: item.desc,
         status: 'active',
         variants: {
-          create: [
-            {
-              sku: `${cleanSku}-STD`,
-              price: item.price,
-              stock: 50,
-              status: 'active',
-              attributes: { type: 'Standard' }, // 👈 Complies with Postgres JSON format requirement
-              images: {
-                create: [
-                  {
-                    url: item.img,
-                    isMain: true
-                  }
-                ]
-              }
-            }
-          ]
+          create: variantsToCreate
         }
       },
     });
   }
 
-  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with variants and images successfully.`);
+  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with realistic variant attributes.`);
 }
 
 main()
