@@ -129,59 +129,92 @@ export const getCategoryBySlug = async (req, res) => {
     } = req.query;
 
     const where = { categoryId: category.id, status: 'active' };
-    if (minPrice) where.price = { ...where.price, gte: parseFloat(minPrice) };
-    if (maxPrice) where.price = { ...where.price, lte: parseFloat(maxPrice) };
 
-    let orderBy = [{ createdAt: 'desc' }];
-    if (sort === 'price-low')  orderBy = [{ price: 'asc' }];
-    if (sort === 'price-high') orderBy = [{ price: 'desc' }];
-    // 'rating' and 'newest' sorted after fetch (rating is computed, not stored)
+    // Apply price filter on variants since price is moved to variant
+    if (minPrice || maxPrice) {
+      where.variants = {
+        some: {
+          status: 'active',
+          price: {
+            gte: minPrice ? parseFloat(minPrice) : undefined,
+            lte: maxPrice ? parseFloat(maxPrice) : undefined,
+          }
+        }
+      };
+    }
 
-    const pageNum  = Math.max(1, parseInt(page,  10));
-    const limitNum = Math.max(1, parseInt(limit, 10));
-    const skip     = (pageNum - 1) * limitNum;
+    // Fetch all matching active listings for memory-based sorting and pagination
+    const listings = await prisma.listing.findMany({
+      where,
+      include: {
+        seller:  { select: { shopName: true, shopUrl: true } },
+        reviews: { select: { rating: true } },
+        variants: {
+          where: { status: 'active' },
+          include: {
+            images: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    const [listings, totalListings] = await Promise.all([
-      prisma.listing.findMany({
-        where,
-        include: {
-          seller:  { select: { shopName: true, shopUrl: true } },
-          reviews: { select: { rating: true } },
-        },
-        orderBy,
-        skip,
-        take: limitNum,
-      }),
-      prisma.listing.count({ where }),
-    ]);
-
-    // 4. Compute avg rating per listing
+    // 4. Map DB listings to schema variants and compute fields
     let data = listings.map((listing) => {
+      const activeVariants = listing.variants || [];
+      const standardVariant = activeVariants[0]; // first or standard variant
+      
+      const price = standardVariant ? standardVariant.price : 0;
+      const stock = activeVariants.reduce((sum, v) => sum + v.stock, 0);
+      
+      let image = '';
+      if (standardVariant && standardVariant.images && standardVariant.images.length > 0) {
+        const mainImg = standardVariant.images.find(img => img.isMain);
+        image = mainImg ? mainImg.url : standardVariant.images[0].url;
+      }
+
       const ratings  = listing.reviews.map((r) => r.rating);
       const avgRating = ratings.length > 0
         ? ratings.reduce((a, b) => a + b, 0) / ratings.length
         : 4.5;
+
       return {
         id:          listing.id,
         title:       listing.title,
         description: listing.description,
-        price:       listing.price,
-        stock:       listing.stock,
+        price,
+        stock,
         status:      listing.status,
         rating:      parseFloat(avgRating.toFixed(1)),
         reviewCount: ratings.length,
         seller:      listing.seller,
         createdAt:   listing.createdAt,
+        image,
       };
     });
 
     // Post-fetch filters/sorts that depend on computed rating
     if (minRating) data = data.filter((l) => l.rating >= parseFloat(minRating));
-    if (sort === 'rating') data.sort((a, b) => b.rating - a.rating);
+
+    if (sort === 'price-low') {
+      data.sort((a, b) => a.price - b.price);
+    } else if (sort === 'price-high') {
+      data.sort((a, b) => b.price - a.price);
+    } else if (sort === 'rating') {
+      data.sort((a, b) => b.rating - a.rating);
+    } else {
+      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    const pageNum  = Math.max(1, parseInt(page,  10));
+    const limitNum = Math.max(1, parseInt(limit, 10));
+    const totalListings = data.length;
+    const skip     = (pageNum - 1) * limitNum;
+    const paginatedListings = data.slice(skip, skip + limitNum);
 
     const result = {
       category: { id: category.id, name: category.name, icon: category.icon, slug },
-      listings: data,
+      listings: paginatedListings,
       pagination: {
         page:       pageNum,
         limit:      limitNum,
