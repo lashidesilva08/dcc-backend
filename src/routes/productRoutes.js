@@ -1,26 +1,21 @@
 import express from "express";
-
 import {getAllProducts,getCategories,getProductById,createProduct,updateProduct,deleteProduct,getProductReviews,submitReview
 } from "../controllers/productControllers.js";
 
 const router = express.Router();
 
-// Public Routes
-router.get("/", getAllProducts);
+// 1. SPECIFIC Public Routes (Always put static paths first!)
 router.get("/categories", getCategories);
-router.get("/:id", getProductById);
 router.get("/reviews/:productId", getProductReviews);
 
-// Protected Routes (Sellers/Buyers)
+// 2. DYNAMIC Public Routes (Put parameter paths at the bottom)
+router.get("/", getAllProducts);
+router.get("/:id", getProductById); 
+
+// 3. Protected Routes
 router.post("/", createProduct);          // Seller only logic
 router.put("/:id", updateProduct);        // Seller only logic
 router.delete("/:id", deleteProduct);     // Seller only logic
-router.post("/reviews", submitReview);    // Buyer only logic
-
-
-
-// Protected Buyer Routes
-router.post("/reviews",submitReview); // Rate and review
-
+router.post("/reviews", submitReview);    // Buyer only logic (Removed the duplicate line)
 
 export default router;
