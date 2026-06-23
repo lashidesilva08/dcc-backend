@@ -1,3 +1,5 @@
+import prisma from "../config/prismaa.js";
+
 export const createShop = async (req, res) => {
 
     res.status(201).json({ message: "Shop created successfully", shop: req.body });
