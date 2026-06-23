@@ -34,7 +34,20 @@ async function main() {
     },
   });
 
-  // 2. Seed Categories (using createMany with skipDuplicates)
+  // 2. Seed a Reviewer User
+  const reviewer = await prisma.user.upsert({
+    where: { email: 'customer@example.com' },
+    update: {},
+    create: {
+      name: 'John Doe',
+      email: 'customer@example.com',
+      password: await bcrypt.hash('123', 10),
+      role: 'CUSTOMER',
+      verified: true,
+    },
+  });
+
+  // 3. Seed Categories (using createMany with skipDuplicates)
 
   console.log('Seeding categories...');
   const categoriesData = [
@@ -122,43 +135,58 @@ async function main() {
   console.log('Seeding listings with product variants and images...');
 
   // 3. Seed Listings (Checking before create to avoid errors)
-  for (const item of listings) {
-    const existingListing = await prisma.listing.findFirst({ where: { title: item.title } });
-    
-    if (existingListing) {
-      console.log(`Skipping existing listing: ${item.title}`);
-      continue;
+for (const item of listings) {
+    // 1. Handle Listing Creation
+    let listing = await prisma.listing.findFirst({ where: { title: item.title } });
+
+    if (!listing) {
+        console.log(`Creating new listing: ${item.title}`);
+        const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+        const variantDefinitions = getVariantDefinitions(item);
+
+        const variantsToCreate = variantDefinitions.map((v) => ({
+            sku: `${cleanSku}-${v.suffix}`,
+            price: item.price,
+            stock: v.stock,
+            status: 'active',
+            attributes: v.attrs,
+            images: { create: [{ url: v.variantImg || item.img, isMain: true }] }
+        }));
+
+        listing = await prisma.listing.create({
+            data: {
+                sellerId: seller.id,
+                categoryId: categoriesMap[item.slug],
+                title: item.title,
+                description: item.desc,
+                status: 'active',
+                variants: { create: variantsToCreate }
+            },
+        });
+    } else {
+        console.log(`Listing already exists: ${item.title}`);
     }
 
-    console.log(`Creating new listing: ${item.title}`);
-    
-    const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-    
-    const variantDefinitions = getVariantDefinitions(item);
-
-    const variantsToCreate = variantDefinitions.map((v) => ({
-      sku: `${cleanSku}-${v.suffix}`,
-      price: item.price,
-      stock: v.stock,
-      status: 'active',
-      attributes: v.attrs, // This matches your Json field in schema
-      images: {
-        create: [{ url: v.variantImg || item.img, isMain: true }]
-      }
-    }));
-
-    // 3. Construct listing entry
-    await prisma.listing.create({
-      data: {
-        sellerId: seller.id,
-        categoryId: categoriesMap[item.slug],
-        title: item.title,
-        description: item.desc,
-        status: 'active',
-        variants: { create: variantsToCreate }
-      },
+    // 2. Handle Review Creation (Always runs regardless of whether listing was newly created or existing)
+    const reviewExists = await prisma.review.findFirst({ 
+        where: { 
+            listingId: listing.id,
+            userId: reviewer.id // Good practice to check by user too
+        } 
     });
-  }
+
+    if (!reviewExists) {
+        await prisma.review.create({
+            data: {
+                rating: 5,
+                comment: 'Excellent quality! Highly recommended.',
+                userId: reviewer.id,
+                listingId: listing.id,
+            },
+        });
+        console.log(`Added review for: ${item.title}`);
+    }
+}
 }
 
 function getVariantDefinitions(item) {
