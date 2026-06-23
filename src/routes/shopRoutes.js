@@ -7,8 +7,8 @@ import {
 
 const router = express.Router();
 
-router.get("/:shopUrl", getShopBySlug);
-
 router.get("/:shopUrl/products", getShopProductsBySlug);
+
+router.get("/:shopUrl", getShopBySlug);
 
 export default router;
