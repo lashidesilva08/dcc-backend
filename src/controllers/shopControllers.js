@@ -1,4 +1,4 @@
-import prisma from "../config/prismaa.js";
+import prisma from "../config/prisma.js";
 
 export const createShop = async (req, res) => {
 
@@ -240,3 +240,75 @@ export const updateShopBranding = async (req, res) => {
     }
 
 };
+
+export const getShopBySlug = async (req, res) => {
+  try {
+    const { shopUrl } = req.params;
+
+    const shop = await prisma.seller.findUnique({
+      where: {
+        shopUrl,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: shop,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+export const getShopProductsBySlug = async (req, res) => {
+  try {
+    const { shopUrl } = req.params;
+
+    const seller = await prisma.seller.findUnique({
+      where: {
+        shopUrl,
+      },
+    });
+
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: "Shop not found",
+      });
+    }
+
+    const products = await prisma.listing.findMany({
+      where: {
+        sellerId: seller.id,
+      },
+      include: {
+        variants: true,
+        reviews: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: products,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
