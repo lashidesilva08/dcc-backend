@@ -4,25 +4,14 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Clearing existing database...');
-  await prisma.productImage.deleteMany();
-  await prisma.transaction.deleteMany();
-  await prisma.delivery.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.productVariant.deleteMany();
-  await prisma.listing.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.seller.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.deliveryProvider.deleteMany();
 
-  console.log('Seeding default user and seller...');
+  console.log('Seeding data (non-destructive)...');
+  // 1. Seed User & Seller
   const hashedPassword = await bcrypt.hash('123', 10);
-
-  const user = await prisma.user.create({
-    data: {
+  const user = await prisma.user.upsert({
+    where: { email: 'seller@cityretailer.lk' },
+    update: {},
+    create: {
       name: 'City Retailer',
       email: 'seller@cityretailer.lk',
       password: hashedPassword,
@@ -32,8 +21,10 @@ async function main() {
     },
   });
 
-  const seller = await prisma.seller.create({
-    data: {
+  const seller = await prisma.seller.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: {
       userId: user.id,
       shopName: 'City Retailer',
       shopUrl: 'city-retailer',
@@ -42,6 +33,8 @@ async function main() {
       commissionRate: 10.0,
     },
   });
+
+  // 2. Seed Categories (using createMany with skipDuplicates)
 
   console.log('Seeding categories...');
   const categoriesData = [
@@ -54,13 +47,17 @@ async function main() {
     { name: 'Kids',          icon: 'Smile',        slug: 'kids' },
   ];
 
-  const categoriesMap = {};
-  for (const cat of categoriesData) {
-    const created = await prisma.category.create({
-      data: { name: cat.name, icon: cat.icon, status: 'active' },
-    });
-    categoriesMap[cat.slug] = created.id;
-  }
+  await prisma.category.createMany({
+    data: categoriesData,
+    skipDuplicates: true,
+  });
+
+  // Fetch categories to get IDs
+  const categories = await prisma.category.findMany();
+  const categoriesMap = categories.reduce((acc, cat) => {
+    acc[cat.slug] = cat.id;
+    return acc;
+  }, {});
 
   const listings = [
     // Electronics
@@ -124,15 +121,49 @@ async function main() {
 
   console.log('Seeding listings with product variants and images...');
 
+  // 3. Seed Listings (Checking before create to avoid errors)
   for (const item of listings) {
+    const existingListing = await prisma.listing.findFirst({ where: { title: item.title } });
+    
+    if (existingListing) {
+      console.log(`Skipping existing listing: ${item.title}`);
+      continue;
+    }
+
+    console.log(`Creating new listing: ${item.title}`);
+    
     const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    let variantDefinitions = getVariantDefinitions(item);
 
-    // 1. Define category-specific color & size variants along with unique images
-    let variantDefinitions = [];
+    const variantsToCreate = variantDefinitions.map((v) => ({
+      sku: `${cleanSku}-${v.suffix}`,
+      price: item.price,
+      stock: v.stock,
+      status: 'active',
+      attributes: v.attrs,
+      images: {
+        create: [{ url: v.variantImg || item.img, isMain: true }]
+      }
+    }));
 
-    if (item.slug === 'fashion') {
-      variantDefinitions = [
-        { 
+    await prisma.listing.create({
+      data: {
+        sellerId: seller.id,
+        categoryId: categoriesMap[item.slug],
+        title: item.title,
+        description: item.desc,
+        status: 'active',
+        variants: { create: variantsToCreate }
+      },
+    });
+  }
+}
+
+function getVariantDefinitions(item) {
+    const isDevice = item.title.includes('Galaxy') || item.title.includes('MacBook');
+      if (item.slug === 'fashion') 
+        return [ 
+          { 
           suffix: 'BLK-S', 
           attrs: { Color: 'Black', Size: 'S' }, 
           stock: 15, 
@@ -156,11 +187,10 @@ async function main() {
           stock: 10, 
           variantImg: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=500' 
         },
-      ];
-    } else if (item.slug === 'electronics') {
-      const isDevice = item.title.includes('Galaxy') || item.title.includes('MacBook');
-      variantDefinitions = [
-        { 
+       ];
+      if (item.slug === 'electronics') 
+        return [ 
+                { 
           suffix: 'SLV', 
           attrs: { Color: 'Silver', Size: isDevice ? '256GB' : 'Standard' }, 
           stock: 30,
@@ -172,10 +202,11 @@ async function main() {
           stock: 20,
           variantImg: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=500' // Slate dark profile image
         }
+
       ];
-    } else if (item.slug === 'home') {
-      variantDefinitions = [
-        { 
+       if (item.slug === 'home')
+        return [
+                  { 
           suffix: 'GY-QN', 
           attrs: { Color: 'Slate Gray', Size: 'Queen' }, 
           stock: 15,
@@ -193,52 +224,9 @@ async function main() {
           stock: 18,
           variantImg: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=500' // Rich Blue tone bedroom arrangement
         }
-      ];
-    } else {
-      // Default fallback handles Groceries, Beauty, Sports, Kids
-      variantDefinitions = [
-        { 
-          suffix: 'STD', 
-          attrs: { Color: 'Default', Size: 'Standard' }, 
-          stock: 50,
-          variantImg: item.img // Uses the original image matching the generic list item
-        }
-      ];
-    }
+      ]
 
-    // 2. Map definitions directly to the schema specifications
-    const variantsToCreate = variantDefinitions.map((v) => ({
-      sku: `${cleanSku}-${v.suffix}`,
-      price: item.price,
-      stock: v.stock,
-      status: 'active',
-      attributes: v.attrs,
-      images: {
-        create: [
-          {
-            url: v.variantImg || item.img, // Correctly pins image records down into individual nested variant records!
-            isMain: true
-          }
-        ]
-      }
-    }));
-
-    // 3. Construct listing entry
-    await prisma.listing.create({
-      data: {
-        sellerId: seller.id,
-        categoryId: categoriesMap[item.slug],
-        title: item.title,
-        description: item.desc,
-        status: 'active',
-        variants: {
-          create: variantsToCreate
-        }
-      },
-    });
-  }
-
-  console.log(`✅ Seeded ${categoriesData.length} categories and ${listings.length} listings with individual variant image mappings successfully.`);
+      return [{ suffix: 'STD', attrs: { Color: 'Default', Size: 'Standard' }, stock: 50, variantImg: item.img }];
 }
 
 main()
