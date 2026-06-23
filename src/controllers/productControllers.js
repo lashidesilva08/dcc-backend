@@ -32,13 +32,17 @@ export const getProductById = async (req, res) => {
             });
         }
 
-        // Fetch product and include its related images mapping
+        // Fetch product and include its variants (with specifications/images), category, and seller
         const product = await prisma.listing.findUnique({
             where: {
                 id: productId,
             },
             include: {
-                images: true,    // This fetches all related rows from ProductImage table
+                variants: {
+                    include: {
+                        images: true // Fetches related rows from ProductImage table for each variant
+                    }
+                },
                 category: true,  // Optional: includes category details (name, icon)
                 seller: {        // Optional: includes shop name and shop URL
                     select: {
@@ -72,7 +76,6 @@ export const getProductById = async (req, res) => {
         });
     }
 };
-
 // 4. Create product (Seller Only)
 export const createProduct = async (req, res) => {
     const productData = req.body;
