@@ -25,7 +25,7 @@ export const getShopAnalytics = async (req, res) => {
         }
 
         // 3. Check for uniqueness
-        const existingShop = await prisma.shop.findFirst({
+        const existingShop = await prisma.seller.findFirst({
             where: { OR: [{ shop_name }, { shop_url }] }
         });
         if (existingShop) {
@@ -33,7 +33,7 @@ export const getShopAnalytics = async (req, res) => {
         }
 
         // 4. Create Shop
-        const newShop = await prisma.shop.create({
+        const newShop = await prisma.seller.create({
             data: {
                 shop_name,
                 shop_url,
@@ -52,9 +52,9 @@ export const getShopAnalytics = async (req, res) => {
 
 export const getShopById = async (req, res) => {
     try {
-        const shop = await prisma.shop.findUnique({
+        const shop = await prisma.seller.findUnique({
             where: { id: req.params.id },
-            include: { products: true } // Include associated product listings
+            include: { listings: true } // Include associated product listings
         });
 
         if (!shop) return res.status(404).json({ error: "Shop not found" });
@@ -71,12 +71,12 @@ export const updateShop = async (req, res) => {
         const shopId = req.params.id;
 
         // Validation: Check ownership
-        const shop = await prisma.shop.findUnique({ where: { id: shopId } });
+        const shop = await prisma.seller.findUnique({ where: { id: shopId } });
         if (shop.user_id !== req.user.id) {
             return res.status(401).json({ error: "Unauthorized to update this shop." });
         }
 
-        const updatedShop = await prisma.shop.update({
+        const updatedShop = await prisma.seller.update({
             where: { id: shopId },
             data: { shop_banner, description, phone }
         });
@@ -101,13 +101,13 @@ export const approveShop = async (req, res) => {
         }
 
         // 2. Check if Shop exists
-        const shop = await prisma.shop.findUnique({ where: { id: parseInt(id) } });
+        const shop = await prisma.seller.findUnique({ where: { id: parseInt(id) } });
         if (!shop) {
             return res.status(404).json({ error: "Shop not found." });
         }
 
         // 3. Update Status to ACTIVE
-        const approvedShop = await prisma.shop.update({
+        const approvedShop = await prisma.seller.update({
             where: { id: parseInt(id) },
             data: { status: 'ACTIVE' }
         });
@@ -123,13 +123,13 @@ export const getShopProducts = async (req, res) => {
         const { id } = req.params; // Shop ID
 
         // 1. Validate Shop Existence
-        const shop = await prisma.shop.findUnique({ where: { id: parseInt(id) } });
+        const shop = await prisma.seller.findUnique({ where: { id: parseInt(id) } });
         if (!shop) {
             return res.status(404).json({ error: "Shop not found." });
         }
 
-        // 2. Fetch all products for this shop
-        const products = await prisma.product.findMany({
+        // 2. Fetch all products for this shopyy
+        const products = await prisma.listing.findMany({
             where: { shop_id: parseInt(id) },
             orderBy: { createdAt: 'desc' }
         });
@@ -151,7 +151,7 @@ export const toggleShopStatus = async (req, res) => {
         }
 
         // 2. Update status
-        const updatedShop = await prisma.shop.update({
+        const updatedShop = await prisma.seller.update({
             where: { id: parseInt(id) },
             data: { status }
         });
@@ -222,7 +222,7 @@ export const updateShopBranding = async (req, res) => {
         }
 
         // 2. Update Branding (Ensuring the user owns the shop)
-        const updatedShop = await prisma.shop.updateMany({
+        const updatedShop = await prisma.seller.updateMany({
             where: { user_id: userId },
             data: {
                 shop_banner,
