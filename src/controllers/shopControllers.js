@@ -25,6 +25,25 @@ export const getAllShops = async (req, res) => {
   }
 };
 
+export const getShopByUrl = async (req, res) => {
+  try {
+    const { shopUrl } = req.params;
+
+    const shop = await prisma.seller.findUnique({
+      where: { shop_url: shopUrl },
+      include: { user: true }
+    });
+
+    if (!shop) {
+      return res.status(404).json({ error: "Shop not found" });
+    }
+
+    res.status(200).json({ success: true, data: shop });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const getShopAnalytics = async (req, res) => {
     res.status(200).json({ totalSales: 50000, profileViews: 1200 });
 
