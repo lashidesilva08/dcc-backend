@@ -7,7 +7,7 @@ async function main() {
 
   console.log('Seeding users and sellers...');
   
-
+// 1. Seed Seller Users and their Shops
 const hashedPassword = await bcrypt.hash('123', 10);
 
 const sellersData = [
@@ -45,6 +45,7 @@ const sellersData = [
   },
 ];
 
+// We can add more sellers here as needed
 const sellers = [];
 
 for (const s of sellersData) {
@@ -175,7 +176,7 @@ for (const s of sellersData) {
     { slug: 'kids',        title: 'Ultimate Art & Craft Kit',            desc: 'CRAYOLA - Complete art kit with crayons, paint, and more.',   price: 5490, img: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500' },
     { slug: 'kids',        title: 'World Map Jigsaw Puzzle 100pc',      desc: 'RAVENSBURGER - Educational world map jigsaw puzzle.',          price: 3990, img: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=500' },
   ];
-
+//sellerId: 1, categoryId will be mapped from slug, title, description, price, img (for variant image), status: 'active', createdAt/updatedAt auto
   const seller = sellers[0];
 
   console.log('Seeding listings with product variants and images...');
