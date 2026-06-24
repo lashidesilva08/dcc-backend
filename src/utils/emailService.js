@@ -3,7 +3,7 @@ import sgMail from '@sendgrid/mail';
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export const sendVerificationEmail = async (email, token) => {
-  const verifyLink = `http://localhost:5000/api/v1/auth/verify-email?token=${token}`;
+  const verifyLink = `http://localhost:5173/verify-email?token=${token}`;
   
   const msg = {
     to: email,
