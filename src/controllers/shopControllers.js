@@ -5,6 +5,25 @@ export const createShop = async (req, res) => {
     res.status(201).json({ message: "Shop created successfully", shop: req.body });
 };
 
+export const getAllShops = async (req, res) => {
+  try {
+    const shops = await prisma.seller.findMany({
+      include: {
+        user: true
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: shops
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+};
 
 export const getShopAnalytics = async (req, res) => {
     res.status(200).json({ totalSales: 50000, profileViews: 1200 });
