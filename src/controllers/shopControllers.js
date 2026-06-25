@@ -8,13 +8,16 @@ export const createShop = async (req, res) => {
 export const getAllShops = async (req, res) => {
   try {
     const shops = await prisma.seller.findMany({
-      include: {
-        user: true
-      },
-      orderBy: {
-    id: 'asc',
-  },
-    });
+        include: {
+         user: true,
+        _count: {
+        select: {
+            listings: true
+      }
+    }
+  }
+});
+    
 
     res.status(200).json({
       success: true,
@@ -34,7 +37,7 @@ export const getShopByUrl = async (req, res) => {
 
     const shop = await prisma.seller.findUnique({
       where: { shopUrl: shopUrl },
-      include: { user: true }
+      include: { user: true, listings: true }
     });
 
     if (!shop) {
