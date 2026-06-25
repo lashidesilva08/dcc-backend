@@ -28,12 +28,19 @@ model Seller {
   shopName       String
   shopUrl        String?     @unique
   businessType   String
+
+  image          String?
+  bannerImage    String?
+
   status         String      @default("pending")
   commissionRate Float       @default(10.0)
+
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+
   listings       Listing[]
   orderItems     OrderItem[]
+
   user           User        @relation(fields: [userId], references: [id])
 }
 
