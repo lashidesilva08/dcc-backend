@@ -12,37 +12,104 @@ const hashedPassword = await bcrypt.hash('123', 10);
 
 const sellersData = [
   {
-    name: 'City Retailer',
-    email: 'seller@cityretailer.lk',
-    phone: '+94771234567',
-    shopName: 'City Retailer',
-    shopUrl: 'city-retailer',
-    businessType: 'Retail',
+    name: "City Retailer",
+    email: "seller@cityretailer.lk",
+    phone: "+94771234567",
+    shopName: "City Retailer",
+    shopUrl: "city-retailer",
+    businessType: "Retail",
+    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
+    bannerImage: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab",
   },
+
   {
-    name: 'Tech Hub Sri Lanka',
-    email: 'techhub@gmail.com',
-    phone: '+94770000001',
-    shopName: 'Tech Hub',
-    shopUrl: 'tech-hub',
-    businessType: 'Electronics',
+    name: "Tech Hub Sri Lanka",
+    email: "techhub@gmail.com",
+    phone: "+94770000001",
+    shopName: "Tech Hub",
+    shopUrl: "tech-hub",
+    businessType: "Electronics",
+    image: "https://images.unsplash.com/photo-1498049794561-7780e7231661",
+    bannerImage: "https://images.unsplash.com/photo-1518770660439-4636190af475",
   },
+
   {
-    name: 'Fashion Corner',
-    email: 'fashion@gmail.com',
-    phone: '+94770000002',
-    shopName: 'Fashion Corner',
-    shopUrl: 'fashion-corner',
-    businessType: 'Fashion',
+    name: "Fashion Corner",
+    email: "fashion@gmail.com",
+    phone: "+94770000002",
+    shopName: "Fashion Corner",
+    shopUrl: "fashion-corner",
+    businessType: "Fashion",
+    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8",
+    bannerImage: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
   },
+
   {
-    name: 'Home Essentials',
-    email: 'home@gmail.com',
-    phone: '+94770000003',
-    shopName: 'Home Essentials',
-    shopUrl: 'home-essentials',
-    businessType: 'Home & Living',
+    name: "Home Essentials",
+    email: "home@gmail.com",
+    phone: "+94770000003",
+    shopName: "Home Essentials",
+    shopUrl: "home-essentials",
+    businessType: "Home & Living",
+    image:"https://images.unsplash.com/photo-1484154218962-a197022b5858",
+    bannerImage: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
   },
+
+  {
+    name: "Fresh Mart",
+    email: "freshmart@gmail.com",
+    phone: "+94770000004",
+    shopName: "Fresh Mart",
+    shopUrl: "fresh-mart",
+    businessType: "Groceries",
+    image: "https://images.unsplash.com/photo-1542838132-92c53300491e",
+    
+  },
+
+  {
+    name: "Beauty Bliss",
+    email: "beauty@gmail.com",
+    phone: "+94770000005",
+    shopName: "Beauty Bliss",
+    shopUrl: "beauty-bliss",
+    businessType: "Beauty",
+    image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9"
+    ,
+  },
+
+  {
+    name: "Sports Zone",
+    email: "sports@gmail.com",
+    phone: "+94770000006",
+    shopName: "Sports Zone",
+    shopUrl: "sports-zone",
+    businessType: "Sports",
+    image: "https://images.unsplash.com/photo-1517649763962-0c623066013b"
+   
+  },
+
+  {
+    name: "Kids Paradise",
+    email: "kids@gmail.com",
+    phone: "+94770000007",
+    shopName: "Kids Paradise",
+    shopUrl: "kids-paradise",
+    businessType: "Kids",
+    image: "https://images.unsplash.com/photo-1516627145497-ae6968895b74"
+  
+  },
+
+  {
+    name: "Gadget World",
+    email: "gadget@gmail.com",
+    phone: "+94770000008",
+    shopName: "Gadget World",
+    shopUrl: "gadget-world",
+    businessType: "Electronics",
+    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9"
+    
+  },
+
 ];
 
 // We can add more sellers here as needed
@@ -63,17 +130,23 @@ for (const s of sellersData) {
 });
 
   const seller = await prisma.seller.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: {
-      userId: user.id,
-      shopName: s.shopName,
-      shopUrl: s.shopUrl,
-      businessType: s.businessType,
-      status: 'active',
-      commissionRate: 10.0,
-    },
-  });
+  where: { userId: user.id },
+  update: {
+    image: s.image,
+    shopName: s.shopName,
+    shopUrl: s.shopUrl,
+    businessType: s.businessType,
+  },
+  create: {
+    userId: user.id,
+    shopName: s.shopName,
+    shopUrl: s.shopUrl,
+    businessType: s.businessType,
+    image: s.image,
+    status: "active",
+    commissionRate: 10,
+  },
+});
 
   sellers.push(seller);
 }
