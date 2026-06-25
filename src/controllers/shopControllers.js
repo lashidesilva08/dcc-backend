@@ -10,7 +10,10 @@ export const getAllShops = async (req, res) => {
     const shops = await prisma.seller.findMany({
       include: {
         user: true
-      }
+      },
+      orderBy: {
+    id: 'asc',
+  },
     });
 
     res.status(200).json({
@@ -30,7 +33,7 @@ export const getShopByUrl = async (req, res) => {
     const { shopUrl } = req.params;
 
     const shop = await prisma.seller.findUnique({
-      where: { shop_url: shopUrl },
+      where: { shopUrl: shopUrl },
       include: { user: true }
     });
 
@@ -48,11 +51,11 @@ export const getShopAnalytics = async (req, res) => {
     res.status(200).json({ totalSales: 50000, profileViews: 1200 });
 
     try {
-        const { shop_name, shop_url, business_type, description } = req.body;
+        const { shop_name, shopUrl, business_type, description } = req.body;
         const userId = req.user.id; // From your authMiddleware
 
         // 1. Validations
-        if (!shop_name || !shop_url || !business_type) {
+        if (!shop_name || !shopUrl || !business_type) {
             return res.status(400).json({ error: "Please provide all required fields." });
         }
 
@@ -64,7 +67,7 @@ export const getShopAnalytics = async (req, res) => {
 
         // 3. Check for uniqueness
         const existingShop = await prisma.seller.findFirst({
-            where: { OR: [{ shop_name }, { shop_url }] }
+            where: { OR: [{ shop_name }, { shopUrl }] }
         });
         if (existingShop) {
             return res.status(400).json({ error: "Shop name or URL already exists." });
@@ -74,7 +77,7 @@ export const getShopAnalytics = async (req, res) => {
         const newShop = await prisma.seller.create({
             data: {
                 shop_name,
-                shop_url,
+                shopUrl,
                 business_type,
                 description,
                 user_id: userId,
@@ -333,7 +336,11 @@ export const getShopProductsBySlug = async (req, res) => {
         sellerId: seller.id,
       },
       include: {
-        variants: true,
+        variants: {
+          include: {
+            images: true,
+          },
+        },
         reviews: true,
       },
     });
@@ -349,4 +356,3 @@ export const getShopProductsBySlug = async (req, res) => {
     });
   }
 };
-
