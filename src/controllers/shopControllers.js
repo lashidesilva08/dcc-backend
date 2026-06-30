@@ -8,25 +8,49 @@ export const createShop = async (req, res) => {
 export const getAllShops = async (req, res) => {
   try {
     const shops = await prisma.seller.findMany({
-        include: {
-         user: true,
+      include: {
+        user: true,
+        listings: {
+          select: {
+            sold: true,
+          },
+        },
         _count: {
-        select: {
-            listings: true
-      }
-    }
-  }
-});
-    
+          select: {
+            listings: true,
+          },
+        },
+      },
+      orderBy: {
+        shopName: "asc",
+      },
+    });
+
+    const formattedShops = shops.map((shop) => {
+      const productCount = shop._count.listings;
+
+      const totalSold = shop.listings.reduce(
+        (sum, listing) => sum + (listing.sold || 0),
+        0
+      );
+
+      return {
+        ...shop,
+        productCount,
+        totalSold,
+      };
+    });
 
     res.status(200).json({
       success: true,
-      data: shops
+      data: formattedShops,
     });
-
   } catch (error) {
+    console.error(error);
+
     res.status(500).json({
-      error: error.message
+      success: false,
+      error: error.message,
     });
   }
 };
