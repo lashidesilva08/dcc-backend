@@ -9,49 +9,56 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  name      String
   email     String   @unique
-  password  String
-  role      String
-  phone     String?
-  verified  Boolean  @default(false)
-
-  seller    Seller?
-  reviews   Review[]
-  orders    Order[]
-
-
+  name      String
   createdAt DateTime @default(now())
+  password  String
+  phone     String?
+  role      String
   updatedAt DateTime @updatedAt
+  verified  Boolean  @default(false)
+  orders    Order[]
+  reviews   Review[]
+  seller    Seller?
 }
 
 model Seller {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique
-  shopName      String
-  shopUrl       String?  @unique
-  businessType  String
-  status        String   @default("pending")
-  commissionRate Float   @default(10.0)
+  id             Int         @id @default(autoincrement())
+  userId         Int         @unique
+  shopName       String
+  shopUrl        String?     @unique
+  businessType   String
 
-  user      User       @relation(fields: [userId], references: [id])
-  listings  Listing[]
-  orderItems OrderItem[]
+  image          String?
+  bannerImage    String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status         String      @default("pending")
+  commissionRate Float       @default(10.0)
+
+  listings       Listing[]
+  orderItems     OrderItem[]
+
+  rating        Float   @default(5)
+  reviewCount   Int     @default(0)
+  views         Int     @default(0)
+  featured      Boolean @default(false)
+  location      String?
+  memberSince   DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User        @relation(fields: [userId], references: [id])
 }
 
 model Category {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   name      String
   slug      String   @unique
   icon      String?
-  status    String   @default("active")
-
+  slug  String?
+  status    String    @default("active")
+  createdAt DateTime  @default(now())
   listings  Listing[]
-
-  createdAt DateTime @default(now())
 }
 
 model Listing {
@@ -60,58 +67,77 @@ model Listing {
   categoryId  Int
   title       String
   description String
-  price       Float
-  stock       Int?
   status      String   @default("active")
 
-  seller    Seller   @relation(fields: [sellerId], references: [id])
-  category  Category @relation(fields: [categoryId], references: [id])
-  reviews   Review[]
-  orderItems OrderItem[]
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
+  
+  // Relations updated for variants
+  variants    ProductVariant[]
+  reviews     Review[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sold Int @default(0)
+
+
+}
+
+model ProductVariant {
+  id         Int      @id @default(autoincrement())
+  listingId  Int
+  sku        String?  @unique // Stock Keeping Unit (optional but recommended)
+  price      Float    // Price can vary by variant (e.g., XXL costs more)
+  stock      Int      @default(0) // Inventory tracked at the variant level
+  status     String   @default("active")
+
+  // The combination details stored as JSON (e.g., {"color": "Red", "size": "XL"})
+  // This gives you the ultimate flexibility without needing complex EAV tables
+  attributes Json     
+
+  listing    Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  images     ProductImage[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Review {
   id        Int      @id @default(autoincrement())
   rating    Int
   comment   String?
-
   userId    Int
   listingId Int
-
-  user      User     @relation(fields: [userId], references: [id])
-  listing   Listing  @relation(fields: [listingId], references: [id])
-
   createdAt DateTime @default(now())
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-
 model Order {
-  id              Int           @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   userId          Int
-  orderNumber     String        @unique
+  orderNumber     String       @unique
   totalAmount     Float
-  deliveryFee     Float         @default(0)
+  deliveryFee     Float        @default(0)
   paymentMethod   String
-  paymentStatus   String        @default("pending")
-  orderStatus     String        @default("placed")
+  paymentStatus   String       @default("pending")
+  orderStatus     String       @default("placed")
   deliveryAddress String
   notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  user            User          @relation(fields: [userId], references: [id])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  delivery        Delivery?
+  user            User         @relation(fields: [userId], references: [id])
   orderItems      OrderItem[]
   transactions    Transaction?
-  delivery        Delivery?
 }
 
 model OrderItem {
   id         Int      @id @default(autoincrement())
   orderId    Int
-  listingId  Int
+  variantId  Int      // Changed from listingId to variantId
   sellerId   Int
   quantity   Int
   unitPrice  Float
@@ -121,7 +147,7 @@ model OrderItem {
   updatedAt  DateTime @updatedAt
 
   order      Order    @relation(fields: [orderId], references: [id])
-  listing    Listing  @relation(fields: [listingId], references: [id])
+  variant    ProductVariant @relation(fields: [variantId], references: [id]) // Changed relation
   seller     Seller   @relation(fields: [sellerId], references: [id])
 }
 
@@ -137,7 +163,6 @@ model Transaction {
   paidAt               DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
-
   order                Order     @relation(fields: [orderId], references: [id])
 }
 
@@ -152,7 +177,6 @@ model DeliveryProvider {
   status        String     @default("pending")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-
   deliveries    Delivery[]
 }
 
@@ -160,7 +184,7 @@ model Delivery {
   id                 Int               @id @default(autoincrement())
   orderId            Int               @unique
   deliveryProviderId Int?
-  trackingNumber     String?            @unique
+  trackingNumber     String?           @unique
   pickupAddress      String
   deliveryAddress    String
   deliveryStatus     String            @default("pending")
@@ -169,7 +193,16 @@ model Delivery {
   deliveredAt        DateTime?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
-
-  order              Order             @relation(fields: [orderId], references: [id])
   deliveryProvider   DeliveryProvider? @relation(fields: [deliveryProviderId], references: [id])
+  order              Order             @relation(fields: [orderId], references: [id])
+}
+
+model ProductImage {
+  id         Int            @id @default(autoincrement())
+  variantId  Int            // 👈 Points to the variant now
+  url        String
+  isMain     Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 }

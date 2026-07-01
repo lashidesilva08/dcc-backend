@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../config/redis.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 
 const prisma = new PrismaClient();
 
@@ -24,19 +25,24 @@ export const register = async (req, res) => {
     if (existing) {
       return res.status(400).json({ message: 'An account with this email already exists.' });
     }
-    const password_hash = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
       data: {
         name,
         email: email.toLowerCase().trim(),
-        password_hash,
+        password: hashedPassword,
         role: role || 'BUYER',
         verified: false
       }
     });
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await redisClient.setEx(`verify:${verifyToken}`, 24 * 60 * 60, user.id.toString());
+    await sendVerificationEmail(user.email, verifyToken);
+
     const token = generateToken(user.id, user.role);
     res.status(201).json({
-      message: 'Account created successfully.',
+      message: 'Account created successfully. Please check your email to verify your account.',
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role }
     });
@@ -61,13 +67,13 @@ export const login = async (req, res) => {
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
 
-    if (!user || !user.password_hash) {
+    if (!user || !user.password) {
       await redisClient.incr(rateLimitKey);
       await redisClient.expire(rateLimitKey, 15 * 60);
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       await redisClient.incr(rateLimitKey);
       await redisClient.expire(rateLimitKey, 15 * 60);
@@ -113,9 +119,9 @@ export const forgotPassword = async (req, res) => {
     if (!user) return res.status(200).json({ message: successMessage });
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    await redisClient.setEx(`reset:${resetToken}`, 3600, user.id);
+    await redisClient.setEx(`reset:${resetToken}`, 3600, user.id.toString());
+    await sendPasswordResetEmail(user.email, resetToken);
 
-    console.log(`Reset link: http://localhost:3000/reset-password?token=${resetToken}`);
     res.status(200).json({ message: successMessage });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -138,8 +144,8 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'This reset link is invalid or has expired.' });
     }
 
-    const password_hash = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({ where: { id: userId }, data: { password_hash } });
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: parseInt(userId) }, data: { password: hashedPassword } });
     await redisClient.del(`reset:${token}`);
 
     res.status(200).json({ message: 'Password reset successful. You can now log in.' });
@@ -149,10 +155,75 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+export const registerSeller = async (req, res) => {
+  try {
+    const { name, email, password, shop_name, business_type, phone } = req.body;
+
+    if (!name || !email || !password || !shop_name || !business_type) {
+      return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) {
+      return res.status(400).json({ message: 'An account with this email already exists.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase().trim(),
+        password: hashedPassword,
+        role: 'SELLER',
+        phone: phone || null,
+        verified: false
+      }
+    });
+
+    await prisma.seller.create({
+      data: {
+        userId: user.id,
+        shopName: shop_name,
+        shopUrl: shop_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        businessType: business_type,
+        status: 'pending'
+      }
+    });
+
+    res.status(201).json({
+      message: 'Seller account submitted. You will receive an email once approved by admin.',
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (error) {
+    console.error('Seller register error:', error);
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+};
+
 export const googleAuth = async (req, res) => {
   res.status(200).json({ message: 'Google login - coming soon' });
 };
 
 export const verifyEmail = async (req, res) => {
-  res.status(200).json({ message: 'Email verification - coming soon' });
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required.' });
+    }
+
+    const userId = await redisClient.get(`verify:${token}`);
+    if (!userId) {
+      return res.status(400).json({ message: 'This verification link is invalid or has expired.' });
+    }
+
+    await prisma.user.update({ where: { id: parseInt(userId) }, data: { verified: true } });
+    await redisClient.del(`verify:${token}`);
+
+    res.status(200).json({ message: 'Email verified successfully. You can now log in.' });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
 };
