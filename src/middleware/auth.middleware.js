@@ -1,10 +1,10 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const redisClient = require('../config/redis');
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import redisClient from '../config/redis.js';
 
 const prisma = new PrismaClient();
 
-const protect = async (req, res, next) => {
+export const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -45,7 +45,7 @@ const protect = async (req, res, next) => {
   }
 };
 
-const requireRole = (...roles) => {
+export const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied.' });
@@ -53,5 +53,3 @@ const requireRole = (...roles) => {
     next();
   };
 };
-
-module.exports = { protect, requireRole };
