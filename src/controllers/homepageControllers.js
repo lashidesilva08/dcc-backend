@@ -1,3 +1,4 @@
+import { prisma } from "../config/prisma.js";
 export const getBanners = async (req, res) => {
     try {
         res.status(200).json({ 
@@ -9,16 +10,39 @@ export const getBanners = async (req, res) => {
     }
 };
 
+
 export const getFeaturedShops = async (req, res) => {
     try {
-        res.status(200).json({ 
-            featured: ["Shop A", "Shop B"],
-            message: "Featured shops for homepage retrieved." 
+        const featuredShops = await prisma.seller.findMany({
+            where: { 
+                status: "ACTIVE",
+                featured: true 
+            },
+            select: {
+                shopName: true,
+                bannerImage: true, 
+                rating: true,     
+                _count: {
+                    select: { listings: true } 
+                }
+            },
+            orderBy: {
+                rating: 'desc' 
+            },
+            take: 2 
         });
+
+        res.status(200).json({ 
+            featured: featuredShops,
+            message: "Featured shops retrieved successfully from database." 
+        });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 export const updateHeroBanner = async (req, res) => {
     try {

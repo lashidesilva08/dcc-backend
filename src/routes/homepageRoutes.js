@@ -7,4 +7,4 @@ router.get("/banners", getBanners);
 router.get("/featured", getFeaturedShops);
 router.put("/banners", updateHeroBanner); // Admin Only
 
-export default router;
+export default router; 
