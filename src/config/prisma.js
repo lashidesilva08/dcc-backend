@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 
+
 const prisma = new PrismaClient({
     log: process.env.NODE_ENV === "development" 
     ? ["query" , "error", "warn"]
@@ -21,3 +22,4 @@ const disconnectDB = async ()=>{
 };
 
 export {prisma, connectDB, disconnectDB};
+export default prisma;
