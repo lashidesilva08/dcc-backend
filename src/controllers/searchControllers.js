@@ -1,4 +1,4 @@
-import prisma from "../config/prisma.js";
+import { prisma } from "../config/prisma.js";
 import redisClient from "../config/redis.js";
 
 /*  AUTOCOMPLETE SUGGESTIONS*/
@@ -112,13 +112,7 @@ export const getTrending = async (req, res) => {
 /* MAIN SEARCH PRODUCTS*/
 export const searchProducts = async (req, res) => {
   try {
-    const {
-      q,
-      category,
-      minPrice,
-      maxPrice,
-      sort,
-    } = req.query;
+    const { q, category, minPrice, maxPrice, sort } = req.query;
 
     const cacheKey = `search:${JSON.stringify(req.query)}`;
 
@@ -187,7 +181,11 @@ export const searchProducts = async (req, res) => {
       include: {
         category: true,
         seller: true,
-        images: true,
+        variants: {
+          include: {
+            images: true,
+          },
+        },
       },
     });
 
@@ -197,11 +195,7 @@ export const searchProducts = async (req, res) => {
       results: listings,
     };
 
-    await redisClient.setEx(
-      cacheKey,
-      300,
-      JSON.stringify(response)
-    );
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
 
     return res.status(200).json(response);
   } catch (error) {
@@ -261,8 +255,12 @@ export const getProductsByCategory = async (req, res) => {
         },
       },
       include: {
-        images: true,
         seller: true,
+        variants: {
+          include: {
+            images: true,
+          },
+        },
       },
     });
 
