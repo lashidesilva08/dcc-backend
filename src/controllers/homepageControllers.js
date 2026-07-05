@@ -128,3 +128,48 @@ export const getActiveFlashSale = async (req, res) => {
     });
   }
 };
+
+
+// Active Categories and  listings 
+export const getActiveCategories = async (req, res) => {
+    try {
+        const categories = await prisma.category.findMany({
+            where: {
+                status: "active" 
+            },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                icon: true,
+                _count: {
+                    select: { listings: true } 
+                }
+            },
+            orderBy: {
+                id: 'asc' 
+            }
+        });
+
+        const formattedCategories = categories.map(cat => ({
+            id: cat.id,
+            label: cat.name,
+            slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'), 
+            icon: cat.icon || "LayoutGrid", // default icon එකක්
+            count: `${cat._count.listings}+ Items` 
+        }));
+
+        return res.status(200).json({
+            success: true,
+            message: "Active categories retrieved successfully from database.",
+            categories: formattedCategories
+        });
+
+    } catch (error) {
+        console.error("Error fetching active categories:", error);
+        return res.status(500).json({ 
+            success: false, 
+            error: error.message || "Internal Server Error" 
+        });
+    }
+};
