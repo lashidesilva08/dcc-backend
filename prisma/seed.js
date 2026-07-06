@@ -318,8 +318,53 @@ for (const s of sellersData) {
 
   console.log('Seeding listings with product variants and images...');
   
+  // 20 new products with different sellers
+  const newListings = [
+    // Electronics - sellers 1,2
+    { slug: 'electronics', seller: 1, title: 'Bose QuietComfort 45 Headphones', desc: 'BOSE - Industry leading noise canceling.', price: 89990, sold: 45, img: 'https://images.unsplash.com/photo-1487215078519-e21cc028cb29?w=500' },
+    { slug: 'electronics', seller: 2, title: 'Samsung Galaxy Buds Pro', desc: 'SAMSUNG - True wireless earbuds with ANC.', price: 34990, sold: 55, img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500' },
+    
+    // Fashion - sellers 3,4
+    { slug: 'fashion', seller: 3, title: 'Premium Wool Winter Coat', desc: 'TOMMY HILFIGER - Classic wool winter coat.', price: 45990, sold: 25, img: 'https://images.unsplash.com/photo-1539533057440-7d8eae11e554?w=500' },
+    { slug: 'fashion', seller: 4, title: 'Elegant Silk Dress', desc: 'ZARA - Beautiful elegant silk evening dress.', price: 28990, sold: 35, img: 'https://images.unsplash.com/photo-1595777712802-cad66be47d5f?w=500' },
+    
+    // Groceries - sellers 5,6
+    { slug: 'groceries', seller: 5, title: 'Organic Olive Oil 500ml', desc: 'BERTOLLI - Premium extra virgin olive oil.', price: 2890, sold: 70, img: 'https://images.unsplash.com/photo-1557652172-758e845fac89?w=500' },
+    { slug: 'groceries', seller: 6, title: 'Almond Butter 500g', desc: 'SKIPPY - Creamy almond butter.', price: 1990, sold: 60, img: 'https://images.unsplash.com/photo-1599599810694-b5ac4dd5e1fb?w=500' },
+    
+    // Home - sellers 7,8
+    { slug: 'home', seller: 7, title: 'Premium Pillow Set of 2', desc: 'LAYLA - Memory foam pillow set.', price: 9990, sold: 40, img: 'https://images.unsplash.com/photo-1584197987211-14ff1b56947c?w=500' },
+    { slug: 'home', seller: 8, title: 'Smart LED Light Bulbs (4pack)', desc: 'LIFX - Smart RGB LED bulbs.', price: 12990, sold: 30, img: 'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=500' },
+    
+    // Beauty - sellers 9,1
+    { slug: 'beauty', seller: 9, title: 'Premium Face Cream 50ml', desc: 'OLAY - Anti-aging face cream.', price: 5990, sold: 0, img: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=500' },
+    { slug: 'beauty', seller: 1, title: 'Face cream 30ml', desc: 'MINOXIDIL - Professional hair serum.', price: 3490, sold: 0, img: 'https://images.unsplash.com/photo-1596462502278-af3efdc991db?w=500' },
+    
+    // Sports - sellers 2,3
+    { slug: 'sports', seller: 2, title: 'Resistance Band Set 5pc', desc: 'WODSOCIAL - Complete resistance band set.', price: 3490, sold: 0, img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500' },
+    { slug: 'sports', seller: 3, title: 'Running Belt with Bottle', desc: 'TRAVELON - Hydration running belt.', price: 2990, sold: 0, img: 'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=500' },
+    
+    // Kids - sellers 4,5
+    { slug: 'kids', seller: 4, title: 'Kids Bicycle 20 Inch', desc: 'DECATHLON - Durable kids bicycle.', price: 18990, sold: 0, img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500' },
+    { slug: 'kids', seller: 5, title: 'Educational Robot Toy', desc: 'OZOBOT - Programmable educational robot.', price: 12490, sold: 0, img: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500' },
+    
+    // Electronics - sellers 6,7
+    { slug: 'electronics', seller: 6, title: 'USB-C Hub 7-in-1', desc: 'ANKER - Multi-port USB-C hub.', price: 6990, sold: 35, img: 'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=500' },
+    { slug: 'electronics', seller: 7, title: '4K Webcam with Mic', desc: 'LOGITECH - Professional 4K webcam.', price: 24990, sold: 28, img: 'https://images.unsplash.com/photo-1612532473829-0146e29bdf08?w=500' },
+    
+    // Fashion - sellers 8,9
+    { slug: 'fashion', seller: 8, title: 'Premium Leather Belt', desc: 'GUCCI - Genuine leather belt.', price: 15990, sold: 42, img: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500' },
+    { slug: 'fashion', seller: 9, title: 'Sports Running Jacket', desc: 'ADIDAS - Waterproof running jacket.', price: 11990, sold: 50, img: 'https://images.unsplash.com/photo-1595777712802-cad66be47d5f?w=500' },
+    
+    // Groceries - sellers 1,2
+    { slug: 'groceries', seller: 1, title: 'Raw Honey 500g', desc: 'Y.S. ECO BEE - Pure raw honey.', price: 1290, sold: 80, img: 'https://images.unsplash.com/photo-1587049352001-66f61d23cbe6?w=500' },
+    { slug: 'groceries', seller: 2, title: 'Dark Chocolate 85% 100g', desc: 'LINDT - Premium dark chocolate.', price: 890, sold: 95, img: 'https://images.unsplash.com/photo-1599599810694-b5ac4dd5e1fb?w=500' },
+  ];
 
-  // 3. Seed Listings (Checking before create to avoid errors)
+  console.log('Seeding original listings...');
+  
+
+  // 3. Seed Original Listings (from sellers[0])
 for (const item of listings) {
     // 1. Handle Listing Creation
     let listing = await prisma.listing.findFirst({ where: { title: item.title } });
@@ -366,6 +411,63 @@ for (const item of listings) {
         await prisma.review.create({
             data: {
                 rating: 5,
+                comment: 'Excellent quality! Highly recommended.',
+                userId: reviewer.id,
+                listingId: listing.id,
+            },
+        });
+        console.log(`Added review for: ${item.title}`);
+    }
+}
+
+console.log('Seeding 20 new listings from different sellers...');
+
+// Seed new listings with different sellers
+for (const item of newListings) {
+    let listing = await prisma.listing.findFirst({ where: { title: item.title } });
+
+    if (!listing) {
+        console.log(`Creating new listing: ${item.title} (Seller: ${item.seller})`);
+        const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+        const variantDefinitions = getVariantDefinitions(item);
+        const selectedSeller = sellers[item.seller - 1]; // seller number is 1-9, array is 0-8
+
+        const variantsToCreate = variantDefinitions.map((v) => ({
+            sku: `${cleanSku}-${selectedSeller.shopUrl.substring(0, 3).toUpperCase()}-${v.suffix}`,
+            price: item.price,
+            stock: v.stock,
+            status: 'active',
+            attributes: v.attrs,
+            images: { create: [{ url: v.variantImg || item.img, isMain: true }] }
+        }));
+
+        listing = await prisma.listing.create({
+            data: {
+                sellerId: selectedSeller.id,
+                categoryId: categoriesMap[item.slug],
+                title: item.title,
+                description: item.desc,
+                status: 'active',
+                sold: item.sold,
+                variants: { create: variantsToCreate }
+            },
+        });
+    } else {
+        console.log(`Listing already exists: ${item.title}`);
+    }
+
+    // Handle Review Creation for new listings
+    const reviewExists = await prisma.review.findFirst({ 
+        where: { 
+            listingId: listing.id,
+            userId: reviewer.id
+        } 
+    });
+
+    if (!reviewExists) {
+        await prisma.review.create({
+            data: {
+                rating: Math.floor(Math.random() * 2) + 4,
                 comment: 'Excellent quality! Highly recommended.',
                 userId: reviewer.id,
                 listingId: listing.id,
