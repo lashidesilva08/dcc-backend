@@ -7,6 +7,6 @@ router.get("/banners", getBanners);
 router.get("/featured", getFeaturedShops);
 router.put("/banners", updateHeroBanner); // Admin Only
 router.get("/flash-sale", getActiveFlashSale);
-router.get('/categories', getActiveCategories);
+router.get("/categories", getActiveCategories);
 
 export default router;  

@@ -130,6 +130,10 @@ export const getActiveFlashSale = async (req, res) => {
 };
 
 
+
+
+
+
 // Active Categories and  listings 
 export const getActiveCategories = async (req, res) => {
     try {
