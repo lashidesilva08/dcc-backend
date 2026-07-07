@@ -84,7 +84,7 @@ export const getAllCategories = async (req, res) => {
       id: cat.id,
       name: cat.name,
       icon: cat.icon,
-      slug: cat.slug || nameToSlug(cat.name),
+      slug: nameToSlug(cat.name),
       listingCount: cat._count.listings,
       createdAt: cat.createdAt,
     }));
@@ -111,12 +111,8 @@ export const getCategoryBySlug = async (req, res) => {
     }
 
     // 2. Find the category by matching slug
-    let category = await prisma.category.findFirst({ where: { slug, status: 'active' } });
-    
-    if (!category) {
-       const allCategories = await prisma.category.findMany({ where: { status: 'active' } });
-       category = allCategories.find((c) => (c.slug || nameToSlug(c.name)) === slug);
-    }
+    const allCategories = await prisma.category.findMany({ where: { status: 'active' } });
+    const category = allCategories.find((c) => nameToSlug(c.name) === slug);
 
     if (!category) {
       return res.status(404).json({ success: false, message: 'Category not found' });
@@ -236,35 +232,14 @@ export const getCategoryBySlug = async (req, res) => {
   }
 };
 
-export const getCategory = async (req, res) => {
-    try {
-        const { param } = req.params;
-        const isId = !isNaN(parseInt(param));
-        
-        const category = await prisma.category.findFirst({
-            where: isId ? { id: parseInt(param) } : { slug: param }
-        });
-        
-        if (!category) {
-            return res.status(404).json({ message: "Category not found." });
-        }
-
-        res.status(200).json({ message: `Fetched details for category: ${param}`, category });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
 // ── POST /api/v1/categories  (Admin only) ───────────────────────────────────
 export const createCategory = async (req, res) => {
   try {
     const { name, icon } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
-    const slug = nameToSlug(name);
-
     const category = await prisma.category.create({
-      data: { name, slug, icon: icon ?? null, status: 'active' },
+      data: { name, icon: icon ?? null, status: 'active' },
     });
 
     await cacheClearCategories();  // invalidate all category caches
@@ -283,7 +258,7 @@ export const updateCategory = async (req, res) => {
     const category = await prisma.category.update({
       where: { id: parseInt(id, 10) },
       data: {
-        ...(name   && { name, slug: nameToSlug(name) }),
+        ...(name   && { name }),
         ...(icon !== undefined && { icon }),
         ...(status && { status }),
       },

@@ -9,48 +9,21 @@ export const getAllShops = async (req, res) => {
   try {
     const shops = await prisma.seller.findMany({
       include: {
-        user: true,
-        listings: {
-          select: {
-            sold: true,
-          },
-        },
-        _count: {
-          select: {
-            listings: true,
-          },
-        },
+        user: true
       },
       orderBy: {
-        shopName: "asc",
-      },
-    });
-
-    const formattedShops = shops.map((shop) => {
-      const productCount = shop._count.listings;
-
-      const totalSold = shop.listings.reduce(
-        (sum, listing) => sum + (listing.sold || 0),
-        0
-      );
-
-      return {
-        ...shop,
-        productCount,
-        totalSold,
-      };
+    id: 'asc',
+  },
     });
 
     res.status(200).json({
       success: true,
-      data: formattedShops,
+      data: shops
     });
-  } catch (error) {
-    console.error(error);
 
+  } catch (error) {
     res.status(500).json({
-      success: false,
-      error: error.message,
+      error: error.message
     });
   }
 };
@@ -61,7 +34,7 @@ export const getShopByUrl = async (req, res) => {
 
     const shop = await prisma.seller.findUnique({
       where: { shopUrl: shopUrl },
-      include: { user: true, listings: true }
+      include: { user: true }
     });
 
     if (!shop) {
