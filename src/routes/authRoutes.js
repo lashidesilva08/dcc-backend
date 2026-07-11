@@ -1,11 +1,12 @@
 import express from "express";
-import { forgotPassword, googleAuth, login, logout, register, registerSeller, resetPassword, verifyEmail } from "../controllers/authControllers.js";
+import { forgotPassword, googleAuth, login, logout, register, registerSeller, resetPassword, verifyEmail, adminLogin } from "../controllers/authControllers.js";
 
 const router = express.Router()
 
 router.post("/register", register);
 router.post("/login", login);
 router.post("/google", googleAuth);
+router.post("/admin/login", adminLogin);
 router.get("/verify-email", verifyEmail);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);

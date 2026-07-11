@@ -202,6 +202,42 @@ export const registerSeller = async (req, res) => {
   }
 };
 
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    if (!user || !user.password) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    if (user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Access denied. Not an admin account.' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    const token = generateToken(user.id, user.role);
+
+    res.status(200).json({
+      message: 'Admin login successful.',
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+};
+
 export const googleAuth = async (req, res) => {
   res.status(200).json({ message: 'Google login - coming soon' });
 };
