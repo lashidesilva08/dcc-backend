@@ -21,6 +21,9 @@ model User {
   orders    Order[]
   reviews   Review[]
   seller    Seller?
+  deliveryProvider DeliveryProvider?
+  deliveryDriver   DeliveryDriver?
+  deliveryNotifications DeliveryNotification[]
 }
 
 model Seller {
@@ -29,16 +32,10 @@ model Seller {
   shopName       String
   shopUrl        String?     @unique
   businessType   String
-
   image          String?
   bannerImage    String?
-
   status         String      @default("pending")
   commissionRate Float       @default(10.0)
-
-  listings       Listing[]
-  orderItems     OrderItem[]
-
   rating        Float   @default(5)
   reviewCount   Int     @default(0)
   views         Int     @default(0)
@@ -48,6 +45,8 @@ model Seller {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  listings       Listing[]
+  orderItems     OrderItem[]
   user           User        @relation(fields: [userId], references: [id])
 }
 
@@ -55,7 +54,6 @@ model Category {
   id        Int       @id @default(autoincrement())
   name      String
   icon      String?
-  slug  String?
   status    String    @default("active")
   createdAt DateTime  @default(now())
   listings  Listing[]
@@ -78,10 +76,6 @@ model Listing {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  sold Int @default(0)
-
-
 }
 
 model ProductVariant {
@@ -168,32 +162,74 @@ model Transaction {
 
 model DeliveryProvider {
   id            Int        @id @default(autoincrement())
+  userId        Int?       @unique
   providerName  String
   contactPerson String
   email         String     @unique
   phone         String
   serviceArea   String
   baseFee       Float
+  businessRegNo String?
+  district      String?
+  settings      Json?
+  rejectionReason String?
   status        String     @default("pending")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  user          User?      @relation(fields: [userId], references: [id])
   deliveries    Delivery[]
+  drivers       DeliveryDriver[]
+}
+
+model DeliveryDriver {
+  id              Int      @id @default(autoincrement())
+  providerId      Int
+  userId          Int?     @unique
+  fullName        String
+  email           String
+  phone           String
+  licenseNo       String?
+  vehicleType     String   @default("Motorcycle")
+  vehiclePlate    String?
+  isAvailable     Boolean  @default(true)
+  totalDeliveries Int      @default(0)
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  provider        DeliveryProvider @relation(fields: [providerId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+  deliveries      Delivery[]
+}
+
+model DeliveryNotification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Delivery {
   id                 Int               @id @default(autoincrement())
   orderId            Int               @unique
   deliveryProviderId Int?
+  assignedDriverId   Int?
   trackingNumber     String?           @unique
   pickupAddress      String
   deliveryAddress    String
-  deliveryStatus     String            @default("pending")
+  deliveryStatus     String            @default("CONFIRMED")
+  trackingPoints     Json?
+  statusHistory      Json?
+  failureReason      String?
   assignedAt         DateTime?
   pickedUpAt         DateTime?
   deliveredAt        DateTime?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   deliveryProvider   DeliveryProvider? @relation(fields: [deliveryProviderId], references: [id])
+  assignedDriver     DeliveryDriver?   @relation(fields: [assignedDriverId], references: [id])
   order              Order             @relation(fields: [orderId], references: [id])
 }
 
@@ -205,4 +241,15 @@ model ProductImage {
   createdAt  DateTime       @default(now())
   
   variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model SupportInquiry {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -1,25 +1,32 @@
 import express from "express";
-
-
+import {
+searchProducts,
+getSearchSuggestions,
+getTrending,
+getAllCategories,
+getProductsByCategory,
+} from "../controllers/searchControllers.js";
 
 const router = express.Router();
 
-router.get("/suggestions", getSuggestions);
-router.get("/trending", getTrending);
-
-import { searchProducts, getAllCategories, getProductsByCategory, getSearchSuggestions,getSuggestions,getTrending} from "../controllers/searchControllers.js";
-
-//    Search products by keyword, filters (price, rating, etc.), and sorting
+// Search products
+// GET /api/v1/search?q=iphone
 router.get("/", searchProducts);
 
-//    Get autocomplete suggestions based on search query
+// Autocomplete suggestions
+//GET /api/v1/search/suggestions?q=iph
 router.get("/suggestions", getSearchSuggestions);
 
-//   Get all marketplace categories (Fashion, Groceries, etc.)
+// Trending searches/products
+//GET /api/v1/search/trending
+router.get("/trending", getTrending);
+
+// Get all categories
+//GET /api/v1/search/categories
 router.get("/categories", getAllCategories);
 
-//   Get products within a specific category
+// Get products by category
+//GET /api/v1/search/category/Electronics
 router.get("/category/:slug", getProductsByCategory);
-
 
 export default router;
