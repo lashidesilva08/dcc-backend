@@ -20,6 +20,7 @@ const sellersData = [
     businessType: "Retail",
     image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d",
     bannerImage: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab",
+    
   },
 
   {
@@ -126,6 +127,7 @@ for (const s of sellersData) {
     role: 'SELLER',
     phone: s.phone,
     verified: true,
+    product_count: listings.filter(listing => listing.seller === s.shopUrl).length, // Count of products for this seller
   },
 });
 
@@ -137,6 +139,7 @@ for (const s of sellersData) {
     shopUrl: s.shopUrl,
     businessType: s.businessType,
   },
+  
   create: {
     userId: user.id,
     shopName: s.shopName,
