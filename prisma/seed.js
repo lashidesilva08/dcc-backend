@@ -172,13 +172,13 @@ for (const s of sellersData) {
 
   console.log('Seeding categories...');
   const categoriesData = [
-    { name: 'Electronics',   icon: 'Laptop',      slug: 'electronics' },
-    { name: 'Fashion',       icon: 'Shirt',       slug: 'fashion' },
-    { name: 'Groceries',     icon: 'ShoppingBag',  slug: 'groceries' },
-    { name: 'Home',          icon: 'Home',         slug: 'home' },
-    { name: 'Beauty',        icon: 'Sparkles',     slug: 'beauty' },
-    { name: 'Sports',        icon: 'Activity',     slug: 'sports' },
-    { name: 'Kids',          icon: 'Smile',        slug: 'kids' },
+    { name: 'Electronics',   icon: 'Laptop' },
+    { name: 'Fashion',       icon: 'Shirt' },
+    { name: 'Groceries',     icon: 'ShoppingBag' },
+    { name: 'Home',          icon: 'Home' },
+    { name: 'Beauty',        icon: 'Sparkles' },
+    { name: 'Sports',        icon: 'Activity' },
+    { name: 'Kids',          icon: 'Smile' },
   ];
 
   await prisma.category.createMany({
