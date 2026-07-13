@@ -1,18 +1,15 @@
-import express from "express";
-import { getProfile, updateProfile, changePassword, deleteAccount } from "../controllers/userControllers.js";
+import express from 'express'
+import { protect } from '../middleware/auth.js'
+import { changePassword, deleteAccount, getProfile, updateProfile } from '../controllers/userControllers.js'
 
-const router = express.Router();
+const router = express.Router()
 
+router.use(protect)
 
-router.get("/profile", getProfile);
-router.put("/profile", updateProfile);
+router.get('/me', getProfile)
+router.get('/profile', getProfile)
+router.put('/profile', updateProfile)
+router.put('/change-password', changePassword)
+router.delete('/account', deleteAccount)
 
-
-// Profile Management
-router.get("/profile", getProfile);
-// Security and Account
-router.put("/change-password", changePassword);
-
-router.delete("/account", deleteAccount);
-
-export default router;
+export default router
