@@ -35,7 +35,7 @@ model Seller {
   status         String      @default("pending")
   commissionRate Float       @default(10.0)
 
-  listings       Listing[]
+  listings       Listing[]  //listings
   orderItems     OrderItem[]
 
   rating        Float   @default(5)

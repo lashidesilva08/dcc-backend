@@ -193,6 +193,7 @@ for (const s of sellersData) {
     location: s.location,
     memberSince: s.memberSince,
   },
+  
   create: {
     userId: user.id,
     shopName: s.shopName,
