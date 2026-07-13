@@ -9,7 +9,11 @@ export const getAllShops = async (req, res) => {
   try {
     const shops = await prisma.seller.findMany({
       include: {
-        user: true
+        user: true,
+        _count: {
+            select: {
+                 listings: true } // Count the number of listings for each shop
+        }
       },
       orderBy: {
     id: 'asc',
@@ -34,7 +38,7 @@ export const getShopByUrl = async (req, res) => {
 
     const shop = await prisma.seller.findUnique({
       where: { shopUrl: shopUrl },
-      include: { user: true }
+      include: { user: true, _count: { select: { listings: true } } }
     });
 
     if (!shop) {
@@ -95,7 +99,7 @@ export const getShopById = async (req, res) => {
     try {
         const shop = await prisma.seller.findUnique({
             where: { id: req.params.id },
-            include: { listings: true } // Include associated product listings
+            include: { listings: true, _count: { select: { listings: true } } } // Include associated product listings and count
         });
 
         if (!shop) return res.status(404).json({ error: "Shop not found" });
