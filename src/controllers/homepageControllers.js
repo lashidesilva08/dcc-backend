@@ -56,7 +56,7 @@ export const updateHeroBanner = async (req, res) => {
 
 
 
-
+/*
 export const getActiveFlashSale = async (req, res) => {
   try {
     const flashSale = await prisma.flashSale.findFirst({
@@ -128,7 +128,7 @@ export const getActiveFlashSale = async (req, res) => {
     });
   }
 };
-
+*/
 
 
 
@@ -144,7 +144,6 @@ export const getActiveCategories = async (req, res) => {
             select: {
                 id: true,
                 name: true,
-                slug: true,
                 icon: true,
                 _count: {
                     select: { listings: true } 
