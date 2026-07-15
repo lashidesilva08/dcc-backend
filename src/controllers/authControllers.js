@@ -26,6 +26,7 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'An account with this email already exists.' });
     }
     const hashedPassword = await bcrypt.hash(password, 12);
+    
     const user = await prisma.user.create({
       data: {
         name,
@@ -36,15 +37,20 @@ export const register = async (req, res) => {
       }
     });
 
-    const verifyToken = crypto.randomBytes(32).toString('hex');
-    await redisClient.setEx(`verify:${verifyToken}`, 24 * 60 * 60, user.id.toString());
-    await sendVerificationEmail(user.email, verifyToken);
+    // Generate a 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Save to Redis with a 10-minute timer (600 seconds)
+    await redisClient.setEx(`otp:${user.email}`, 600, otp);
+    
+    // Send OTP to Postman for testing (Remove this in production)
+    const debug_otp = otp; 
 
     const token = generateToken(user.id, user.role);
     res.status(201).json({
       message: 'Account created successfully. Please check your email to verify your account.',
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      debug_otp: debug_otp 
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -225,5 +231,46 @@ export const verifyEmail = async (req, res) => {
   } catch (error) {
     console.error('Verify email error:', error);
     res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+
+ 
+};
+// ==========================================
+// VERIFY OTP ENDPOINT (For 6-digit code)
+// ==========================================
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: "Email and OTP are required." });
+    }
+
+    // 1. Check Redis for the 6-digit code
+    const storedOTP = await redisClient.get(`otp:${email.toLowerCase().trim()}`);
+
+    if (!storedOTP) {
+      return res.status(400).json({ success: false, message: "OTP expired or invalid." });
+    }
+
+    // 2. Check if it matches
+    if (storedOTP !== otp) {
+      return res.status(400).json({ success: false, message: "Incorrect OTP code." });
+    }
+
+    // 3. Permanently verify the user in PostgreSQL
+    await prisma.user.update({
+      where: { email: email.toLowerCase().trim() },
+      data: { verified: true }
+    });
+
+    // 4. Delete the OTP from Redis
+    await redisClient.del(`otp:${email.toLowerCase().trim()}`);
+
+    res.status(200).json({ success: true, message: "Email verified successfully!" });
+
+  } catch (error) {
+    console.error("OTP Verification Error:", error);
+    res.status(500).json({ success: false, message: "Server error during verification." });
   }
 };
