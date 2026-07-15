@@ -1,36 +1,138 @@
 import prisma from "../config/prisma.js";
 
+
 export const createShop = async (req, res) => {
 
     res.status(201).json({ message: "Shop created successfully", shop: req.body });
 };
 
-export const getAllShops = async (req, res) => {
+export const getAllShops = async (req,res)=>{
+    try{
+
+        const userId = req.user?.id;
+
+        const shops = await prisma.seller.findMany({
+            include:{
+                user:true,
+                favouritedBy:userId ? {
+                    where:{
+                        userId
+                    },
+                    select:{
+                        id:true
+                    }
+                } : false,
+                _count:{
+                    select:{
+                        listings:true,
+                        favouritedBy:true
+                    }
+                }
+            },
+            orderBy:{
+                id:"asc"
+            }
+        });
+
+        const data = shops.map(shop=>({
+
+            ...shop,
+
+            favouriteCount:shop._count.favouritedBy,
+
+            isFavourite:userId
+                ? shop.favouritedBy.length>0
+                :false
+
+        }));
+
+        res.json({
+            success:true,
+            data
+        });
+
+    }catch(error){
+
+        res.status(500).json({
+            success:false,
+            message:error.message
+        });
+
+    }
+}
+
+export const searchShops = async (req, res) => {
   try {
+    const { q } = req.query;
+
+    const userId = req.user?.id;
+
     const shops = await prisma.seller.findMany({
+      where: {
+        OR: [
+          {
+            shopName: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+          {
+            businessType: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+          {
+            description: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+
       include: {
         user: true,
+        favouritedBy: userId
+          ? {
+              where: {
+                userId,
+              },
+              select: {
+                id: true,
+              },
+            }
+          : false,
+
         _count: {
-            select: {
-                 listings: true } // Count the number of listings for each shop
-        }
+          select: {
+            listings: true,
+            favouritedBy: true,
+          },
+        },
       },
-      orderBy: {
-    id: 'asc',
-  },
     });
 
-    res.status(200).json({
+    const data = shops.map((shop) => ({
+      ...shop,
+      favouriteCount: shop._count.favouritedBy,
+      isFavourite: userId
+        ? shop.favouritedBy.length > 0
+        : false,
+    }));
+
+    res.json({
       success: true,
-      data: shops
+      data,
     });
-
   } catch (error) {
     res.status(500).json({
-      error: error.message
+      success: false,
+      message: error.message,
     });
   }
 };
+
 
 export const getShopByUrl = async (req, res) => {
   try {
@@ -108,6 +210,101 @@ export const getShopById = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+};
+
+export const toggleFavouriteShop = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const sellerId = Number(req.params.id);
+
+    const favourite =
+      await prisma.favouriteShop.findUnique({
+        where: {
+          userId_sellerId: {
+            userId,
+            sellerId,
+          },
+        },
+      });
+
+    if (favourite) {
+      await prisma.favouriteShop.delete({
+        where: {
+          id: favourite.id,
+        },
+      });
+
+      return res.json({
+        success: true,
+        favourite: false,
+      });
+    }
+
+    await prisma.favouriteShop.create({
+      data: {
+        userId,
+        sellerId,
+      },
+    });
+
+    res.json({
+      success: true,
+      favourite: true,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+export const getFavouriteStatus = async (
+  req,
+  res
+) => {
+  try {
+    const userId = req.user.id;
+    const sellerId = Number(req.params.id);
+
+    const favourite =
+      await prisma.favouriteShop.findUnique({
+        where: {
+          userId_sellerId: {
+            userId,
+            sellerId,
+          },
+        },
+      });
+
+    res.json({
+      success: true,
+      favourite: !!favourite,
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+export const getFavouriteCount = async (
+  req,
+  res
+) => {
+  const sellerId = Number(req.params.id);
+
+  const count =
+    await prisma.favouriteShop.count({
+      where: {
+        sellerId,
+      },
+    });
+
+  res.json({
+    success: true,
+    count,
+  });
 };
 
 export const updateShop = async (req, res) => {
