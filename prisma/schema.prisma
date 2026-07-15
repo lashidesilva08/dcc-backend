@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -95,6 +96,7 @@ model ProductVariant {
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  flashSaleItems FlashSaleItem[]
 }
 
 model Review {
@@ -240,6 +242,7 @@ model ProductImage {
   createdAt  DateTime       @default(now())
   
   variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
 }
 
 model SupportInquiry {
@@ -251,4 +254,30 @@ model SupportInquiry {
   status    String   @default("open")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+
+
+model FlashSale {
+  id        String          @id @default(uuid())
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  status    String          @default("active") // active, inactive
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     FlashSaleItem[]
+}
+
+model FlashSaleItem {
+  id             String         @id @default(uuid())
+  flashSaleId    String
+  flashSale      FlashSale      @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
+  variantId      Int
+  productVariant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  flashPrice     Float
+  flashStock     Int            @default(0)
+  soldCount      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
