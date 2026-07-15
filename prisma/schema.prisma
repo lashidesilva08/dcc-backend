@@ -258,9 +258,6 @@ model SupportInquiry {
 
 
 
-
-
-
 model FlashSale {
   id        String          @id @default(uuid())
   title     String

@@ -28,7 +28,7 @@ app.use(cors({
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
-  },
+  }, 
   credentials: true,
 }));
 app.use(express.urlencoded({extended:true}))

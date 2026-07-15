@@ -4,10 +4,11 @@ import { getBanners, getFeaturedShops, updateHeroBanner,getActiveFlashSale, getA
 const router = express.Router();
 
 router.get("/banners", getBanners);
-router.get("/featured", getFeaturedShops);
 router.put("/banners", updateHeroBanner); // Admin Only
-router.get("/flash-sale", getActiveFlashSale);
 
 router.get("/categories", getActiveCategories);
+router.get("/featured", getFeaturedShops);
+router.get("/flash-sale", getActiveFlashSale);
 
-export default router;  
+
+export default router;   
