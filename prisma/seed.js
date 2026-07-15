@@ -127,7 +127,8 @@ for (const s of sellersData) {
     role: 'SELLER',
     phone: s.phone,
     verified: true,
-    product_count: listings.filter(listing => listing.seller === s.shopUrl).length, // Count of products for this seller
+    
+ 
   },
 });
 
@@ -138,6 +139,8 @@ for (const s of sellersData) {
     shopName: s.shopName,
     shopUrl: s.shopUrl,
     businessType: s.businessType,
+    favouriteShops: { connect: [] }, // Initialize with an empty array
+    
   },
   
   create: {
@@ -189,7 +192,7 @@ for (const s of sellersData) {
   // Fetch categories to get IDs
   const categories = await prisma.category.findMany();
   const categoriesMap = categories.reduce((acc, cat) => {
-    acc[cat.slug] = cat.id;
+    acc[cat.name.toLowerCase()] = cat.id;
     return acc;
   }, {});
 
@@ -252,6 +255,27 @@ for (const s of sellersData) {
     { slug: 'kids',        title: 'Ultimate Art & Craft Kit',            desc: 'CRAYOLA - Complete art kit with crayons, paint, and more.',   price: 5490, img: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500' },
     { slug: 'kids',        title: 'World Map Jigsaw Puzzle 100pc',      desc: 'RAVENSBURGER - Educational world map jigsaw puzzle.',          price: 3990, img: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=500' },
   ];
+
+console.log("Seeding favourite shops...");
+
+await prisma.favouriteShop.createMany({
+    data:[
+        {
+            userId: reviewer.id,
+            sellerId: sellers[0].id
+        },
+        {
+            userId: reviewer.id,
+            sellerId: sellers[2].id
+        },
+        {
+            userId: reviewer.id,
+            sellerId: sellers[4].id
+        }
+    ],
+    skipDuplicates:true
+});
+
 //sellerId: 1, categoryId will be mapped from slug, title, description, price, img (for variant image), status: 'active', createdAt/updatedAt auto
   const seller = sellers[0];
 
