@@ -86,7 +86,7 @@ model Listing {
   category Category @relation(fields: [categoryId], references: [id])
 
   // Relations updated for variants
-  variants ProductVariant[]
+  variants ProductVariant[]  
   reviews  Review[]
 
   createdAt DateTime @default(now())
