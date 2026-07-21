@@ -139,7 +139,7 @@ for (const s of sellersData) {
     shopName: s.shopName,
     shopUrl: s.shopUrl,
     businessType: s.businessType,
-    favouriteShops: { connect: [] }, // Initialize with an empty array
+     // Initialize with an empty array
     
   },
   
