@@ -4,7 +4,7 @@ import redisClient from '../config/redis.js';
 
 const prisma = new PrismaClient();
 
-export const protect = async (req, res, next) => {
+const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -45,7 +45,7 @@ export const protect = async (req, res, next) => {
   }
 };
 
-export const requireRole = (...roles) => {
+const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied.' });
@@ -53,3 +53,5 @@ export const requireRole = (...roles) => {
     next();
   };
 };
+
+export { protect, requireRole };
