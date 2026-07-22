@@ -18,15 +18,38 @@ const generateToken = (userId, role) => {
 export const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+
     if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email and password are required.' });
+      return res.status(400).json({
+        message: 'Name, email and password are required.'
+      });
     }
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    // Rate limiting — max 3 registrations per hour per IP
+    const rateLimitKey = `register_attempts:${req.ip}`;
+    const attempts = await redisClient.get(rateLimitKey);
+
+    if (attempts && parseInt(attempts) >= 3) {
+      return res.status(429).json({
+        message: 'Too many registration attempts. Please try again after 1 hour.'
+      });
+    }
+
+    await redisClient.incr(rateLimitKey);
+    await redisClient.expire(rateLimitKey, 60 * 60);
+
+    const existing = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() }
+    });
+
     if (existing) {
-      return res.status(400).json({ message: 'An account with this email already exists.' });
+      return res.status(400).json({
+        message: 'An account with this email already exists.'
+      });
     }
+
     const hashedPassword = await bcrypt.hash(password, 12);
-    
+
     const user = await prisma.user.create({
       data: {
         name,
@@ -37,24 +60,34 @@ export const register = async (req, res) => {
       }
     });
 
-    // Generate a 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    // Save to Redis with a 10-minute timer (600 seconds)
-    await redisClient.setEx(`otp:${user.email}`, 600, otp);
-    
-    // Send OTP to Postman for testing (Remove this in production)
-    const debug_otp = otp; 
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+
+    await redisClient.setEx(
+      `verify:${verifyToken}`,
+      24 * 60 * 60,
+      user.id.toString()
+    );
+
+    await sendVerificationEmail(user.email, verifyToken);
 
     const token = generateToken(user.id, user.role);
+
     res.status(201).json({
       message: 'Account created successfully. Please check your email to verify your account.',
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-      debug_otp: debug_otp 
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
+
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    res.status(500).json({
+      message: 'Something went wrong. Please try again.'
+    });
   }
 };
 
@@ -204,6 +237,42 @@ export const registerSeller = async (req, res) => {
 
   } catch (error) {
     console.error('Seller register error:', error);
+    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+  }
+};
+
+export const adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    if (!user || !user.password) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    if (user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Access denied. Not an admin account.' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    const token = generateToken(user.id, user.role);
+
+    res.status(200).json({
+      message: 'Admin login successful.',
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (error) {
+    console.error('Admin login error:', error);
     res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
 };

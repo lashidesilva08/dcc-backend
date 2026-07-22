@@ -1,4 +1,5 @@
 import express from "express";
+import passport from './config/passport.js';
 import cors from "cors";
 import path from "path";
 import authRoutes from "./routes/authRoutes.js";
@@ -22,6 +23,7 @@ import HomeRoute from "./routes/homepageRoutes.js";
 const app = express();
 
 app.use(express.json());
+app.use(passport.initialize());
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, Postman) or any localhost origin
