@@ -7,6 +7,7 @@ import productRoutes from "./routes/productRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js"
+
 import wishlistRoutes from "./routes/wishlistRoutes.js"
 import paymentRoutes from "./routes/paymentRoutes.js"
 import adminRoutes from "./routes/adminRoutes.js";
@@ -16,6 +17,8 @@ import shopRoutes from "./routes/shopRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import HomeRoute from "./routes/homepageRoutes.js";
+
 
 const app = express();
 
@@ -28,7 +31,7 @@ app.use(cors({
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
-  },
+  }, 
   credentials: true,
 }));
 app.use(express.urlencoded({extended:true}))
@@ -56,5 +59,7 @@ app.use("/api/v1/shops", shopRoutes);
 app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/search", searchRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/home", HomeRoute);
+
 
 export default app;
