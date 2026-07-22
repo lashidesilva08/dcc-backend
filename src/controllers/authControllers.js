@@ -301,4 +301,45 @@ export const verifyEmail = async (req, res) => {
     console.error('Verify email error:', error);
     res.status(500).json({ message: 'Something went wrong. Please try again.' });
   }
+
+ 
+};
+// ==========================================
+// VERIFY OTP ENDPOINT (For 6-digit code)
+// ==========================================
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: "Email and OTP are required." });
+    }
+
+    // 1. Check Redis for the 6-digit code
+    const storedOTP = await redisClient.get(`otp:${email.toLowerCase().trim()}`);
+
+    if (!storedOTP) {
+      return res.status(400).json({ success: false, message: "OTP expired or invalid." });
+    }
+
+    // 2. Check if it matches
+    if (storedOTP !== otp) {
+      return res.status(400).json({ success: false, message: "Incorrect OTP code." });
+    }
+
+    // 3. Permanently verify the user in PostgreSQL
+    await prisma.user.update({
+      where: { email: email.toLowerCase().trim() },
+      data: { verified: true }
+    });
+
+    // 4. Delete the OTP from Redis
+    await redisClient.del(`otp:${email.toLowerCase().trim()}`);
+
+    res.status(200).json({ success: true, message: "Email verified successfully!" });
+
+  } catch (error) {
+    console.error("OTP Verification Error:", error);
+    res.status(500).json({ success: false, message: "Server error during verification." });
+  }
 };

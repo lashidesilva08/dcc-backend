@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const redisClient = require('../config/redis');
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import redisClient from '../config/redis.js';
 
 const prisma = new PrismaClient();
 
@@ -54,4 +54,4 @@ const requireRole = (...roles) => {
   };
 };
 
-module.exports = { protect, requireRole };
+export { protect, requireRole };

@@ -34,24 +34,25 @@ export const getProductById = async (req, res) => {
 
         // Fetch product and include its variants (with specifications/images), category, and seller
         const product = await prisma.listing.findUnique({
-            where: {
-                id: productId,
-            },
-            include: {
-                variants: {
-                    include: {
-                        images: true // Fetches related rows from ProductImage table for each variant
-                    }
-                },
-                category: true,  // Optional: includes category details (name, icon)
-                seller: {        // Optional: includes shop name and shop URL
-                    select: {
-                        shopName: true,
-                        shopUrl: true
-                    }
-                }
-            },
-        });
+  where: {
+    id: productId,
+  },
+  include: {
+    variants: {
+      include: {
+        images: true,
+      },
+    },
+    reviews: true,
+    category: true,
+    seller: {
+      select: {
+        shopName: true,
+        shopUrl: true,
+      },
+    },
+  },
+});
 
         // If no product matches that ID
         if (!product) {

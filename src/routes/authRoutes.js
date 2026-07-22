@@ -12,5 +12,6 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/logout", logout);
 router.post("/register/seller", registerSeller);
+router.post("/verify-otp", verifyOTP);
 
 export default router;
