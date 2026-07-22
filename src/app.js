@@ -3,7 +3,6 @@ import cors from "cors";
 import path from "path";
 import authRoutes from "./routes/authRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js"
 import categoryRoutes from "./routes/categoryRoutes.js";
@@ -18,6 +17,7 @@ import searchRoutes from "./routes/searchRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 
 const app = express();
+
 
 app.use(express.json());
 app.use(cors({
