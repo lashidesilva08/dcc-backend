@@ -11,9 +11,8 @@
     "reset:delivery-demo": "node scripts/resetDeliveryDemoState.mjs",
     "test:delivery-contact": "node scripts/testDeliveryAndContact.mjs"
   },
-
   "prisma": {
-  "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js"
   },
   "keywords": [],
   "author": "",
@@ -40,4 +39,3 @@
     "prisma": "^6.19.3"
   }
 }
-
