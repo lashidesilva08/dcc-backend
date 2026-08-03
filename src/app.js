@@ -7,6 +7,8 @@ import productRoutes from "./routes/productRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js"
+import emailRoutes from "./routes/email.routes.js";
+//import notificationRoutes from "./routes/notification.routes.js";
 
 import wishlistRoutes from "./routes/wishlistRoutes.js"
 import paymentRoutes from "./routes/paymentRoutes.js"
@@ -44,7 +46,8 @@ app.get("/", (req, res) => {
   res.json({ message: "Digital City Center Backend is running!", status: "active" });
 });
 
-
+app.use("/api/email", emailRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/categories", categoryRoutes);
@@ -58,7 +61,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/shops", shopRoutes);
 app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/search", searchRoutes);
-app.use("/api/v1/notifications", notificationRoutes);
+
 app.use("/api/v1/home", HomeRoute);
 
 

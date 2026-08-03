@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../config/redis.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/emailService.js';
+import emailService from "../services/email.service.js";
+import notificationService from "../services/notification.service.js";
 
 const prisma = new PrismaClient();
 
@@ -69,6 +71,12 @@ export const register = async (req, res) => {
     );
 
     await sendVerificationEmail(user.email, verifyToken);
+
+    // Welcome Email
+    await emailService.sendWelcome(user);
+
+    // Welcome Notification
+    await notificationService.welcome(user.id);
 
     const token = generateToken(user.id, user.role);
 
@@ -159,7 +167,25 @@ export const forgotPassword = async (req, res) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     await redisClient.setEx(`reset:${resetToken}`, 3600, user.id.toString());
-    await sendPasswordResetEmail(user.email, resetToken);
+    const resetLink =
+`${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+await emailService.sendPasswordReset(
+    user,
+    resetLink
+);
+
+await notificationService.create({
+
+    userId:user.id,
+
+    title:"Password Reset",
+
+    message:"Password reset link has been sent to your email.",
+
+    type:"ACCOUNT"
+
+});
 
     res.status(200).json({ message: successMessage });
   } catch (error) {
@@ -294,6 +320,19 @@ export const verifyEmail = async (req, res) => {
     }
 
     await prisma.user.update({ where: { id: parseInt(userId) }, data: { verified: true } });
+
+    await notificationService.create({
+
+    userId:Number(userId),
+
+    title:"Email Verified",
+
+    message:"Your email has been successfully verified.",
+
+    type:"ACCOUNT"
+
+});
+
     await redisClient.del(`verify:${token}`);
 
     res.status(200).json({ message: 'Email verified successfully. You can now log in.' });
