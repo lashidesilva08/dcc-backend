@@ -1,4 +1,6 @@
 import prisma from '../config/prisma.js'
+import emailService from '../services/email.service.js'
+import notificationService from '../services/notification.service.js'
 
 function normalizeProviderStatus(status) {
     const raw = String(status || '').toLowerCase()
@@ -55,8 +57,46 @@ export const getPendingSellers = async (req, res) => {
 };
 
 export const approveSeller = async (req, res) => {
-    const { status } = req.body; // "APPROVED" or "REJECTED"
-    res.status(200).json({ message: `Seller status updated to ${status}` });
+    try {
+        const sellerId = Number(req.params.id);
+        if (!sellerId) {
+            return res.status(400).json({ message: 'Invalid seller id.' });
+        }
+
+        const seller = await prisma.seller.findUnique({
+            where: { id: sellerId },
+            include: { user: true },
+        });
+
+        if (!seller) {
+            return res.status(404).json({ message: 'Seller not found.' });
+        }
+
+        const updated = await prisma.seller.update({
+            where: { id: sellerId },
+            data: { status: 'approved' },
+        });
+
+        try {
+            await emailService.sendSellerApproved({
+                email: seller.user.email,
+                businessName: seller.shopName,
+            });
+        } catch (mailErr) {
+            console.error('Seller approval email failed:', mailErr);
+        }
+
+        try {
+            await notificationService.sellerApproved(seller.user.id);
+        } catch (notifErr) {
+            console.error('Seller approval notification failed:', notifErr);
+        }
+
+        res.status(200).json({ message: 'Seller approved successfully.', seller: updated });
+    } catch (error) {
+        console.error('Approve seller error:', error);
+        res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    }
 };
 
 export const getSalesReport = async (req, res) => {
@@ -78,9 +118,48 @@ export const getDashboard = async (req, res) => {
 
 
 export const rejectSeller = async (req, res) => {
-    res.status(200).json({
-        message: "Seller rejected"
-    });
+    try {
+        const sellerId = Number(req.params.id);
+        const { reason } = req.body;
+
+        if (!sellerId) {
+            return res.status(400).json({ message: 'Invalid seller id.' });
+        }
+
+        const seller = await prisma.seller.findUnique({
+            where: { id: sellerId },
+            include: { user: true },
+        });
+
+        if (!seller) {
+            return res.status(404).json({ message: 'Seller not found.' });
+        }
+
+        const updated = await prisma.seller.update({
+            where: { id: sellerId },
+            data: { status: 'rejected' },
+        });
+
+        try {
+            await emailService.sendSellerRejected(
+                { email: seller.user.email, businessName: seller.shopName },
+                reason || 'Not specified'
+            );
+        } catch (mailErr) {
+            console.error('Seller rejection email failed:', mailErr);
+        }
+
+        try {
+            await notificationService.sellerRejected(seller.user.id);
+        } catch (notifErr) {
+            console.error('Seller rejection notification failed:', notifErr);
+        }
+
+        res.status(200).json({ message: 'Seller rejected.', seller: updated });
+    } catch (error) {
+        console.error('Reject seller error:', error);
+        res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    }
 };
 
 export const suspendSeller = async (req, res) => {
@@ -218,4 +297,3 @@ export const rejectDeliveryProvider = async (req, res) => {
         res.status(500).json({ message: 'Something went wrong. Please try again.' })
     }
 }
-

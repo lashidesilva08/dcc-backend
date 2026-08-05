@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../config/redis.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/emailService.js';
 import emailService from "../services/email.service.js";
 import notificationService from "../services/notification.service.js";
 
@@ -70,7 +69,10 @@ export const register = async (req, res) => {
       user.id.toString()
     );
 
-    await sendVerificationEmail(user.email, verifyToken);
+    const verifyLink = `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`;
+
+    // Verification Email
+    await emailService.sendVerification(user, verifyLink);
 
     // Welcome Email
     await emailService.sendWelcome(user);
