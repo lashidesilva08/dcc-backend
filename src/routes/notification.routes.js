@@ -1,30 +1,30 @@
-//import express from "express";
+import express from "express";
 
-//import {
-  //getNotifications,
-  //getUnreadNotifications,
-  //unreadCount,
-  //markAsRead,
-  //markAllRead,
-  //deleteNotification,
-//} from "../controllers/notification.controller.js";
+import {
+  getNotifications,
+  getUnreadNotifications,
+  unreadCount,
+  markAsRead,
+  markAllRead,
+  deleteNotification,
+} from "../controllers/notification.controller.js";
 
-//import authenticate from "../middleware/auth.middleware.js";
+import { protect } from "../middleware/auth.middleware.js";
 
-//const router = express.Router();
+const router = express.Router();
 
-//router.use(authenticate);
+router.use(protect);
 
-//router.get("/", getNotifications);
+router.get("/", getNotifications);
 
-//router.get("/unread", getUnreadNotifications);
+router.get("/unread", getUnreadNotifications);
 
-//router.get("/count", unreadCount);
+router.get("/count", unreadCount);
 
-//router.patch("/:id/read", markAsRead);
+router.patch("/:id/read", markAsRead);
 
-//router.patch("/read-all", markAllRead);
+router.patch("/read-all", markAllRead);
 
-//router.delete("/:id", deleteNotification);
+router.delete("/:id", deleteNotification);
 
-//export default router;
+export default router;
