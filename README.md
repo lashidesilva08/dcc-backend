@@ -142,7 +142,23 @@ Create a `.env` file:
 ```env
 PORT=5000
 DATABASE_URL="postgresql://username:password@localhost:5432/digital_city_center"
+NODE_ENV="development"
+REDIS_URL="redis://localhost:6379"
 JWT_SECRET=your_secret_key
+GOOGLE_CLIENT_ID=862870385262-3ci4ovdfhj81hbemgc5i69kqlfjt8ldq.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/v1/auth/google/callback
+SMTP_HOST=smtp.gmail.com
+
+SMTP_PORT=587
+
+SMTP_USER=tharzmt@gmail.com
+
+SMTP_PASS=akdsqxgjznbsehrm
+
+MAIL_FROM=Digital City Center <tharzmt@gmail.com>
+
+FRONTEND_URL=http://localhost:5173
 ```
 
 ---
