@@ -1,33 +1,124 @@
+import {
+  addCartItem,
+  clearCartItems,
+  hydrateCart,
+  removeCartItem,
+  updateCartItemQuantity,
+} from '../services/cartService.js'
+
+function sendError(res, error) {
+  const status = error.status || 500
+  return res.status(status).json({
+    success: false,
+    message: error.message || 'Something went wrong while processing your cart.',
+  })
+}
+
 export const getCart = async (req, res) => {
-    res.status(200).json({
-        message: "Cart items retrieved successfully",
-        cart: [
-            { id: "c1", productId: "p101", name: "Designer Shirt", quantity: 1, price: 2500 }
-        ]
-    });
-};
+  try {
+    const cart = await hydrateCart(req.user.id)
+    return res.status(200).json({
+      success: true,
+      message: 'Cart retrieved successfully',
+      cart: cart.items,
+      items: cart.items,
+      summary: cart.summary,
+    })
+  } catch (error) {
+    console.error('getCart error:', error)
+    return sendError(res, error)
+  }
+}
 
 export const addToCart = async (req, res) => {
-    const { productId, quantity } = req.body;
-    res.status(201).json({
-        message: "Product added to cart",
-        addedItem: { productId, quantity }
-    });
-};
+  try {
+    const { variantId, productId, listingId, quantity, color, size } = req.body || {}
+
+    if (!variantId && !productId && !listingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'variantId or productId is required.',
+      })
+    }
+
+    const cart = await addCartItem(req.user.id, {
+      variantId,
+      productId,
+      listingId,
+      quantity,
+      color,
+      size,
+    })
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product added to cart',
+      cart: cart.items,
+      items: cart.items,
+      summary: cart.summary,
+    })
+  } catch (error) {
+    console.error('addToCart error:', error)
+    return sendError(res, error)
+  }
+}
 
 export const removeFromCart = async (req, res) => {
-    const { id } = req.params;
-    res.status(200).json({ message: `Item ${id} removed from cart` });
-};
+  try {
+    const { id } = req.params
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Cart item id is required.' })
+    }
+
+    const cart = await removeCartItem(req.user.id, id)
+    return res.status(200).json({
+      success: true,
+      message: 'Item removed from cart',
+      cart: cart.items,
+      items: cart.items,
+      summary: cart.summary,
+    })
+  } catch (error) {
+    console.error('removeFromCart error:', error)
+    return sendError(res, error)
+  }
+}
 
 export const updateCartItem = async (req, res) => {
-    res.status(200).json({
-        message: "Cart item updated"
-    });
-};
+  try {
+    const { id } = req.params
+    const { quantity } = req.body || {}
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Cart item id is required.' })
+    }
+
+    const cart = await updateCartItemQuantity(req.user.id, id, quantity)
+    return res.status(200).json({
+      success: true,
+      message: 'Cart item updated',
+      cart: cart.items,
+      items: cart.items,
+      summary: cart.summary,
+    })
+  } catch (error) {
+    console.error('updateCartItem error:', error)
+    return sendError(res, error)
+  }
+}
 
 export const clearCart = async (req, res) => {
-    res.status(200).json({
-        message: "Cart cleared"
-    });
-};
+  try {
+    const cart = await clearCartItems(req.user.id)
+    return res.status(200).json({
+      success: true,
+      message: 'Cart cleared',
+      cart: cart.items,
+      items: cart.items,
+      summary: cart.summary,
+    })
+  } catch (error) {
+    console.error('clearCart error:', error)
+    return sendError(res, error)
+  }
+}
