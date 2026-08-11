@@ -15,9 +15,8 @@ export const getNotifications = async (req, res) => {
       count: notifications.length,
       notifications,
     });
-
   } catch (error) {
-    console.error("Get Notifications:", error);
+    console.error("Get Notifications Error:", error);
 
     res.status(500).json({
       success: false,
@@ -31,7 +30,6 @@ export const getNotifications = async (req, res) => {
  */
 export const getUnreadNotifications = async (req, res) => {
   try {
-
     const userId = req.user.id;
 
     const notifications =
@@ -42,16 +40,13 @@ export const getUnreadNotifications = async (req, res) => {
       count: notifications.length,
       notifications,
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Get Unread Notifications Error:", error);
 
     res.status(500).json({
       success: false,
       message: "Failed to load unread notifications.",
     });
-
   }
 };
 
@@ -59,115 +54,102 @@ export const getUnreadNotifications = async (req, res) => {
  * GET /api/notifications/count
  */
 export const unreadCount = async (req, res) => {
-
   try {
-
-    const count =
-      await notificationService.unreadCount(req.user.id);
+    const count = await notificationService.unreadCount(req.user.id);
 
     res.status(200).json({
       success: true,
       unread: count,
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Unread Count Error:", error);
 
     res.status(500).json({
       success: false,
       message: "Unable to count notifications.",
     });
-
   }
-
 };
 
 /**
  * PATCH /api/notifications/:id/read
  */
 export const markAsRead = async (req, res) => {
-
   try {
-
-    await notificationService.markRead(
+    const result = await notificationService.markRead(
       req.params.id,
       req.user.id
     );
+
+    if (result.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: "Notification marked as read.",
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Mark Notification Read Error:", error);
 
     res.status(500).json({
       success: false,
       message: "Unable to update notification.",
     });
-
   }
-
 };
 
 /**
  * PATCH /api/notifications/read-all
  */
 export const markAllRead = async (req, res) => {
-
   try {
-
-    await notificationService.markAllRead(
-      req.user.id
-    );
+    await notificationService.markAllRead(req.user.id);
 
     res.status(200).json({
       success: true,
       message: "All notifications marked as read.",
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Mark All Notifications Read Error:", error);
 
     res.status(500).json({
       success: false,
       message: "Unable to update notifications.",
     });
-
   }
-
 };
 
 /**
  * DELETE /api/notifications/:id
  */
 export const deleteNotification = async (req, res) => {
-
   try {
-
-    await notificationService.delete(
+    const result = await notificationService.delete(
       req.params.id,
       req.user.id
     );
+
+    if (result.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found.",
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: "Notification deleted.",
     });
-
   } catch (error) {
-
-    console.error(error);
+    console.error("Delete Notification Error:", error);
 
     res.status(500).json({
       success: false,
       message: "Unable to delete notification.",
     });
-
   }
-
 };
