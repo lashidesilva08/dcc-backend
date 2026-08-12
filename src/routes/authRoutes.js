@@ -35,29 +35,60 @@ router.get(
   })
 );
 
+// ============================================================
+// GOOGLE LOGIN
+// ============================================================
 router.get(
-  "/google/callback",
-  passport.authenticate("google", {
+  '/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
     session: false,
-    failureRedirect: "/login",
-  }),
-  (req, res) => {
-    const token = jwt.sign(
-      {
-        userId: req.user.id,
-        role: req.user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+  })
+)
 
-    res.redirect(
-      `http://localhost:5173/auth/google/success?token=${token}`
-    );
+// ============================================================
+// GOOGLE CALLBACK
+// ============================================================
+router.get(
+  '/google/callback',
+  passport.authenticate('google', {
+    session: false,
+    failureRedirect:
+      `${process.env.FRONTEND_URL}/login?google=failed`,
+  }),
+
+  (req, res) => {
+    try {
+      const token = jwt.sign(
+        {
+          userId: req.user.id,
+          role: req.user.role,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: '7d',
+        }
+      )
+
+      const frontendUrl =
+        process.env.FRONTEND_URL ||
+        'http://localhost:5173'
+
+      res.redirect(
+        `${frontendUrl}/auth/google/success?token=${encodeURIComponent(token)}`
+      )
+    } catch (error) {
+      console.error(
+        'Google callback error:',
+        error
+      )
+
+      res.redirect(
+        `${process.env.FRONTEND_URL}/login?google=failed`
+      )
+    }
   }
-);
+)
 
 router.post("/forgot-password", forgotPassword);
 
