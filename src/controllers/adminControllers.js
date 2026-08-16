@@ -170,9 +170,61 @@ export const suspendSeller = async (req, res) => {
 
 // Admin: Get all orders
 export const getAllOrders = async (req, res) => {
-    res.status(200).json({
-        message: "All orders fetched"
-    });
+    try {
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+        const statusFilter = req.query.status ? String(req.query.status).toLowerCase() : null;
+        const searchQuery = req.query.search ? String(req.query.search).trim() : null;
+
+        const where = {
+            ...(statusFilter ? { orderStatus: statusFilter } : {}),
+            ...(searchQuery
+                ? {
+                    OR: [
+                        { orderNumber: { contains: searchQuery, mode: "insensitive" } },
+                        { deliveryAddress: { contains: searchQuery, mode: "insensitive" } },
+                        { user: { name: { contains: searchQuery, mode: "insensitive" } } },
+                        { user: { email: { contains: searchQuery, mode: "insensitive" } } },
+                    ],
+                }
+                : {}),
+        };
+
+        const [total, orders] = await Promise.all([
+            prisma.order.count({ where }),
+            prisma.order.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                skip: (page - 1) * limit,
+                take: limit,
+                include: {
+                    user: { select: { id: true, name: true, email: true, phone: true } },
+                    orderItems: {
+                        include: {
+                            seller: { select: { id: true, shopName: true } },
+                            variant: { select: { id: true, sku: true } },
+                        },
+                    },
+                    delivery: true,
+                    transactions: true,
+                },
+            }),
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            orders,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit) || 1,
+            },
+        });
+    } catch (error) {
+        console.error("Admin Get All Orders Error:", error);
+        return res.status(500).json({ success: false, message: "Failed to retrieve platform orders." });
+    }
 };
 
 export const getDeliveryProviders = async (req, res) => {
