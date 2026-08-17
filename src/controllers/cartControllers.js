@@ -5,6 +5,7 @@ import {
   removeCartItem,
   updateCartItemQuantity,
 } from '../services/cartService.js'
+import notificationService from "../services/notification.service.js";
 
 function sendError(res, error) {
   const status = error.status || 500
@@ -49,6 +50,25 @@ export const addToCart = async (req, res) => {
       color,
       size,
     })
+    // Create notification after successful cart addition
+try {
+  const addedItem = cart.items.find(
+    (item) => Number(item.variantId) === Number(variantId)
+  );
+
+  if (addedItem) {
+    await notificationService.cartAdded(
+      req.user.id,
+      addedItem.name,
+      addedItem.productId
+    );
+  }
+} catch (notificationError) {
+  console.error(
+    "Cart notification failed:",
+    notificationError
+  );
+}
 
     return res.status(201).json({
       success: true,

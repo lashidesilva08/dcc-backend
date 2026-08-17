@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import notificationService from "../services/notification.service.js";
 const prisma = new PrismaClient();
 
 // 1. Initiate Payment
@@ -40,29 +41,114 @@ export const initiatePayment = async (req, res) => {
 
 // 2. Handle Payment Webhook (Verification)
 export const handlePaymentWebhook = async (req, res) => {
-    const { gateway } = req.params;
-    const paymentData = req.body;
+  const { gateway } = req.params;
+  const paymentData = req.body;
 
-    try {
-        const isVerified = true; // Placeholder for actual hash validation
+  try {
+    const isVerified = true;
 
-        if (isVerified && paymentData.status_code === 2) { 
-            // COMMENTED OUT PRISMA TO TEST WITHOUT DB:
-            // await prisma.order.update({ ... });
-            
-            console.log(`[Test] Success! Mock updating order ID: ${paymentData.order_id} to CONFIRMED/PAID`);
-            console.log(`[Test] Gateway used: ${gateway}`);
-        } else {
-            console.log(`[Test] Condition not met. Status code received: ${paymentData.status_code}`);
-        }
+    const orderId = Number(paymentData.order_id);
 
-        res.status(200).send("Webhook Received");
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Webhook processing failed" });
+    const order = await prisma.order.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
     }
-};
 
+    // PAYMENT SUCCESS
+    if (isVerified && Number(paymentData.status_code) === 2) {
+
+      await prisma.order.update({
+        where: {
+          id: orderId,
+        },
+        data: {
+          paymentStatus: "PAID",
+          orderStatus: "CONFIRMED",
+        },
+      });
+
+      // Notification
+      try {
+        await notificationService.paymentSuccess(
+          order.userId,
+          order.orderNumber,
+          order.totalAmount
+        );
+
+        await notificationService.orderConfirmed(
+          order.userId,
+          order.orderNumber
+        );
+
+        console.log(
+          "✅ Payment success notifications created"
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ Payment notification failed:",
+          notificationError
+        );
+      }
+
+      console.log(
+        `Payment successful for ${order.orderNumber}`
+      );
+    }
+
+    // PAYMENT FAILED
+    else {
+
+      await prisma.order.update({
+        where: {
+          id: orderId,
+        },
+        data: {
+          paymentStatus: "FAILED",
+        },
+      });
+
+      try {
+        await notificationService.paymentFailed(
+          order.userId,
+          order.orderNumber
+        );
+
+        console.log(
+          "✅ Payment failure notification created"
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ Payment failure notification failed:",
+          notificationError
+        );
+      }
+    }
+
+    return res.status(200).send("Webhook Received");
+
+  } catch (error) {
+    console.error(
+      "Payment webhook error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Webhook processing failed",
+    });
+  }
+};
 // 3. Initiate Refund
 export const initiateRefund = async (req, res) => {
     try {

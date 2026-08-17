@@ -163,17 +163,50 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const updatedOrder = await prisma.order.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        status,
-      },
-      include: {
-        user: true,
-      },
+    if (method === 'COD') {
+
+  const updatedOrder = await prisma.order.update({
+    where: {
+      id: orderId,
+    },
+    data: {
+      orderStatus: "PLACED",
+      paymentStatus: "PENDING",
+    },
+    include: {
+      user: true,
+    },
+  });
+
+  try {
+    await notificationService.orderPlaced(
+      updatedOrder.userId,
+      updatedOrder.orderNumber
+    );
+
+    await notificationService.create({
+      userId: updatedOrder.userId,
+      title: "Cash on Delivery Selected 💵",
+      message: `Your order #${updatedOrder.orderNumber} will be paid on delivery.`,
+      type: "PAYMENT",
+      link: `/orders/${updatedOrder.orderNumber}`,
     });
+
+    console.log("✅ COD notifications created");
+
+  } catch (notificationError) {
+    console.error(
+      "❌ COD notification failed:",
+      notificationError
+    );
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Order placed successfully via COD",
+    orderId: updatedOrder.id,
+  });
+}
 
     // --------------------------------------------------
     // SEND ORDER STATUS EMAIL
@@ -184,7 +217,7 @@ export const updateOrderStatus = async (req, res) => {
         order.user,
         {
           id: order.orderNumber,
-          status,
+          status: order.orderStatus,
         }
       );
 
@@ -485,7 +518,7 @@ export const trackOrder = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      status: order.status,
+      status: order.orderStatus,
     });
   } catch (error) {
     console.error("Track Order Error:", error);
