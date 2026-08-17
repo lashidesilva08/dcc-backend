@@ -103,22 +103,6 @@ export const getCategoryBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    // 1. Check cache (unique key per slug + all filter params)
-    const cacheKey = slugCacheKey(slug, req.query);
-    const cached = await cacheGet(cacheKey);
-    if (cached) {
-      return res.status(200).json({ success: true, data: cached, source: 'cache' });
-    }
-
-    // 2. Find the category by matching slug
-    const allCategories = await prisma.category.findMany({ where: { status: 'active' } });
-    const category = allCategories.find((c) => nameToSlug(c.name) === slug);
-
-    if (!category) {
-      return res.status(404).json({ success: false, message: 'Category not found' });
-    }
-
-    // 3. Build Listing filter from query params
     const {
       minPrice,
       maxPrice,
@@ -128,74 +112,163 @@ export const getCategoryBySlug = async (req, res) => {
       limit = 12,
     } = req.query;
 
-    const where = { categoryId: category.id, status: 'active' };
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 12);
 
-    // Apply price filter on variants since price is moved to variant
+    // ==========================================================
+    // ALL CATEGORIES
+    // ==========================================================
+    let category = null;
+
+    if (slug !== 'all') {
+      const allCategories = await prisma.category.findMany({
+        where: {
+          status: 'active',
+        },
+      });
+
+      category = allCategories.find(
+        (item) => nameToSlug(item.name) === slug.toLowerCase()
+      );
+
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: 'Category not found',
+        });
+      }
+    }
+
+    // ==========================================================
+    // BUILD WHERE
+    // ==========================================================
+    const where = {
+      status: 'active',
+      ...(category
+        ? {
+            categoryId: category.id,
+          }
+        : {}),
+    };
+
     if (minPrice || maxPrice) {
       where.variants = {
         some: {
           status: 'active',
           price: {
-            gte: minPrice ? parseFloat(minPrice) : undefined,
-            lte: maxPrice ? parseFloat(maxPrice) : undefined,
-          }
-        }
+            ...(minPrice ? { gte: Number(minPrice) } : {}),
+            ...(maxPrice ? { lte: Number(maxPrice) } : {}),
+          },
+        },
       };
     }
 
-    // Fetch all matching active listings for memory-based sorting and pagination
+    // ==========================================================
+    // FETCH PRODUCTS
+    // ==========================================================
     const listings = await prisma.listing.findMany({
       where,
       include: {
-        seller:  { select: { shopName: true, shopUrl: true } },
-        reviews: { select: { rating: true } },
+        category: true,
+
+        seller: {
+          select: {
+            id: true,
+            shopName: true,
+            shopUrl: true,
+            image: true,
+            rating: true,
+            reviewCount: true,
+          },
+        },
+
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
+
         variants: {
-          where: { status: 'active' },
+          where: {
+            status: 'active',
+          },
           include: {
-            images: true
-          }
-        }
+            images: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    // 4. Map DB listings to schema variants and compute fields
+    // ==========================================================
+    // NORMALIZE PRODUCTS
+    // ==========================================================
     let data = listings.map((listing) => {
-      const activeVariants = listing.variants || [];
-      const standardVariant = activeVariants[0]; // first or standard variant
-      
-      const price = standardVariant ? standardVariant.price : 0;
-      const stock = activeVariants.reduce((sum, v) => sum + v.stock, 0);
-      
-      let image = '';
-      if (standardVariant && standardVariant.images && standardVariant.images.length > 0) {
-        const mainImg = standardVariant.images.find(img => img.isMain);
-        image = mainImg ? mainImg.url : standardVariant.images[0].url;
+      const variants = listing.variants || [];
+
+      const primaryVariant =
+        variants.find((variant) => Number(variant.stock) > 0) ||
+        variants[0] ||
+        null;
+
+      const ratings = listing.reviews.map(
+        (review) => Number(review.rating) || 0
+      );
+
+      const averageRating =
+        ratings.length > 0
+          ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+          : 4.5;
+
+      let image = null;
+
+      if (primaryVariant?.images?.length) {
+        const mainImage = primaryVariant.images.find(
+          (item) => item.isMain
+        );
+
+        image =
+          mainImage?.url ||
+          primaryVariant.images[0]?.url ||
+          null;
       }
 
-      const ratings  = listing.reviews.map((r) => r.rating);
-      const avgRating = ratings.length > 0
-        ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-        : 4.5;
-
       return {
-        id:          listing.id,
-        title:       listing.title,
+        id: listing.id,
+        title: listing.title,
         description: listing.description,
-        price,
-        stock,
-        status:      listing.status,
-        rating:      parseFloat(avgRating.toFixed(1)),
-        reviewCount: ratings.length,
-        seller:      listing.seller,
-        createdAt:   listing.createdAt,
+        price: Number(primaryVariant?.price || 0),
+        stock: variants.reduce(
+          (sum, variant) => sum + Number(variant.stock || 0),
+          0
+        ),
         image,
+        rating: Number(averageRating.toFixed(1)),
+        reviewCount: ratings.length,
+        sold: listing.sold || 0,
+        status: listing.status,
+        category: listing.category,
+        seller: listing.seller,
+        variants,
+        createdAt: listing.createdAt,
       };
     });
 
-    // Post-fetch filters/sorts that depend on computed rating
-    if (minRating) data = data.filter((l) => l.rating >= parseFloat(minRating));
+    // ==========================================================
+    // RATING FILTER
+    // ==========================================================
+    if (minRating) {
+      data = data.filter(
+        (product) => product.rating >= Number(minRating)
+      );
+    }
 
+    // ==========================================================
+    // SORT
+    // ==========================================================
     if (sort === 'price-low') {
       data.sort((a, b) => a.price - b.price);
     } else if (sort === 'price-high') {
@@ -203,32 +276,68 @@ export const getCategoryBySlug = async (req, res) => {
     } else if (sort === 'rating') {
       data.sort((a, b) => b.rating - a.rating);
     } else {
-      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      data.sort(
+        (a, b) =>
+          new Date(b.createdAt) - new Date(a.createdAt)
+      );
     }
 
-    const pageNum  = Math.max(1, parseInt(page,  10));
-    const limitNum = Math.max(1, parseInt(limit, 10));
+    // ==========================================================
+    // PAGINATION
+    // ==========================================================
     const totalListings = data.length;
-    const skip     = (pageNum - 1) * limitNum;
-    const paginatedListings = data.slice(skip, skip + limitNum);
+    const totalPages =
+      totalListings === 0
+        ? 1
+        : Math.ceil(totalListings / limitNum);
 
+    const skip = (pageNum - 1) * limitNum;
+
+    const paginatedListings = data.slice(
+      skip,
+      skip + limitNum
+    );
+
+    // ==========================================================
+    // RESPONSE
+    // ==========================================================
     const result = {
-      category: { id: category.id, name: category.name, icon: category.icon, slug },
+      category: category
+        ? {
+            id: category.id,
+            name: category.name,
+            icon: category.icon,
+            slug: nameToSlug(category.name),
+          }
+        : {
+            id: null,
+            name: 'All Categories',
+            icon: null,
+            slug: 'all',
+          },
+
       listings: paginatedListings,
+
       pagination: {
-        page:       pageNum,
-        limit:      limitNum,
-        total:      totalListings,
-        totalPages: Math.ceil(totalListings / limitNum),
+        page: pageNum,
+        limit: limitNum,
+        total: totalListings,
+        totalPages,
       },
     };
 
-    // 5. Store in Redis
-    await cacheSet(cacheKey, result, TTL_CATEGORY_SLUG);
-
-    res.status(200).json({ success: true, data: result, source: 'db' });
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Get category error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load category',
+      error: error.message,
+    });
   }
 };
 

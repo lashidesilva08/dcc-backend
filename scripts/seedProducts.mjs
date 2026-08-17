@@ -118,32 +118,125 @@ try {
   let skipped = 0;
 
   for (const item of listings) {
-    const catId = catMap[item.slug];
-    if (!catId) {
-      console.warn(`Category not found for slug: ${item.slug}`);
-      continue;
-    }
+  const catId = catMap[item.slug]
 
-    const exists = await prisma.listing.findFirst({ where: { title: item.title } });
-    if (exists) {
-      skipped++;
-      continue;
-    }
+  if (!catId) {
+    console.warn(
+      `Category not found for slug: ${item.slug}`
+    )
+    continue
+  }
 
-    const cleanSku = item.title.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  // Find existing listing
+  let listing = await prisma.listing.findFirst({
+    where: {
+      title: item.title,
+    },
+  })
 
-    await prisma.listing.create({
+  // ==========================================================
+  // CREATE LISTING IF IT DOES NOT EXIST
+  // ==========================================================
+  if (!listing) {
+    listing = await prisma.listing.create({
       data: {
         sellerId: defaultSeller.id,
         categoryId: catId,
         title: item.title,
         description: item.desc,
-        price: item.price,
         status: 'active',
-      }
-    });
-    created++;
+      },
+    })
+
+    created++
+  } else {
+    skipped++
+
+    // Make sure existing listing points to correct category.
+    if (
+      listing.categoryId !== catId ||
+      listing.status !== 'active'
+    ) {
+      listing = await prisma.listing.update({
+        where: {
+          id: listing.id,
+        },
+        data: {
+          categoryId: catId,
+          status: 'active',
+          description: item.desc,
+        },
+      })
+    }
   }
+
+  // ==========================================================
+  // CHECK VARIANT
+  // ==========================================================
+  let variant = await prisma.productVariant.findFirst({
+    where: {
+      listingId: listing.id,
+    },
+  })
+
+  const cleanSku =
+    item.title
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 12) +
+    `-${listing.id}`
+
+  // ==========================================================
+  // CREATE VARIANT
+  // ==========================================================
+  if (!variant) {
+    variant = await prisma.productVariant.create({
+      data: {
+        listingId: listing.id,
+        sku: cleanSku,
+        price: Number(item.price),
+        stock: 20,
+        status: 'active',
+        attributes: {},
+      },
+    })
+  } else {
+    // Repair old variants
+    variant = await prisma.productVariant.update({
+      where: {
+        id: variant.id,
+      },
+      data: {
+        price: Number(item.price),
+        status: 'active',
+        stock:
+          Number(variant.stock) > 0
+            ? variant.stock
+            : 20,
+      },
+    })
+  }
+
+  // ==========================================================
+  // CHECK IMAGE
+  // ==========================================================
+  const existingImage =
+    await prisma.productImage.findFirst({
+      where: {
+        variantId: variant.id,
+      },
+    })
+
+  if (!existingImage && item.img) {
+    await prisma.productImage.create({
+      data: {
+        variantId: variant.id,
+        url: item.img,
+        isMain: true,
+      },
+    })
+  }
+}
 
   console.log(`\n✅ Done! Created: ${created}, Skipped (already exist): ${skipped}`);
 

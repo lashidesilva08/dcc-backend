@@ -323,4 +323,3 @@ model FlashSaleItem {
   updatedAt      DateTime       @updatedAt
 }
 
-
