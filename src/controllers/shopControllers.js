@@ -535,9 +535,12 @@ export const getShopProductsBySlug = async (req, res) => {
     const products = await prisma.listing.findMany({
       where: {
         sellerId: seller.id,
+        status: 'active',
       },
       include: {
+        category: true,
         variants: {
+          where: { status: 'active' },
           include: {
             images: true,
           },

@@ -140,6 +140,21 @@ export async function hydrateCart(userId) {
   })
   const byId = new Map(variants.map((v) => [v.id, v]))
 
+  const now = new Date()
+  const flashItems = variantIds.length
+    ? await prisma.flashSaleItem.findMany({
+        where: {
+          variantId: { in: variantIds },
+          flashSale: {
+            status: 'active',
+            startTime: { lte: now },
+            endTime: { gte: now },
+          },
+        },
+      })
+    : []
+  const flashByVariant = new Map(flashItems.map((item) => [item.variantId, item]))
+
   const validLines = []
   const items = []
 
@@ -149,8 +164,16 @@ export async function hydrateCart(userId) {
       continue
     }
 
-    const quantity = Math.max(1, Math.min(Number(line.quantity) || 1, variant.stock || 1))
-    const unitPrice = Number(variant.price) || 0
+    const flash = flashByVariant.get(variant.id)
+    const listPrice = Number(variant.price) || 0
+    const unitPrice =
+      flash && Number(flash.flashPrice) > 0 && Number(flash.flashPrice) < listPrice
+        ? Number(flash.flashPrice)
+        : listPrice
+    const availableStock = flash
+      ? Math.min(Number(variant.stock) || 0, Number(flash.flashStock) || 0)
+      : Number(variant.stock) || 0
+    const quantity = Math.max(1, Math.min(Number(line.quantity) || 1, Math.max(availableStock, 1)))
     const lineSubtotal = unitPrice * quantity
     const attrs = attrText(variant.attributes)
 
@@ -177,10 +200,11 @@ export async function hydrateCart(userId) {
       size: attrs.size || '',
       unitPrice,
       price: unitPrice,
+      originalPrice: flash ? listPrice : null,
       quantity,
       lineTotal: lineSubtotal,
       subtotal: lineSubtotal,
-      stock: variant.stock,
+      stock: availableStock,
       sku: variant.sku,
       status: variant.status,
     })
@@ -192,6 +216,11 @@ export async function hydrateCart(userId) {
   }
 
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0)
+  const listSubtotal = items.reduce((sum, item) => {
+    const listUnit = Number(item.originalPrice || item.unitPrice) || 0
+    return sum + listUnit * item.quantity
+  }, 0)
+  const discount = Math.max(0, listSubtotal - subtotal)
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
   const deliveryFee =
     itemCount === 0 ? 0 : subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DEFAULT_DELIVERY_FEE
@@ -203,7 +232,7 @@ export async function hydrateCart(userId) {
       uniqueItems: items.length,
       subtotal,
       deliveryFee,
-      discount: 0,
+      discount,
       total: subtotal + deliveryFee,
       currency: 'LKR',
       freeDeliveryThreshold: FREE_DELIVERY_THRESHOLD,
