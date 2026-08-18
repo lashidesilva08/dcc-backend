@@ -1,43 +1,89 @@
-import dotenv from "dotenv";
-import app from "./app.js";
-import { connectDB, disconnectDB } from "./config/prisma.js";
-import { connectRedis, disconnectRedis } from "./config/redis.js";
+import dotenv from 'dotenv'
 
-dotenv.config();
+dotenv.config()
 
-// Initialize both Data Sources
-const startDataSources = async () => {
-  await connectDB();
-  await connectRedis();
-};
+import app from './app.js'
+import {
+  connectDB,
+  disconnectDB,
+} from './config/prisma.js'
+import {
+  connectRedis,
+  disconnectRedis,
+} from './config/redis.js'
 
-startDataSources();
+const startServer = async () => {
+  try {
+    await connectDB()
+    await connectRedis()
 
-const PORT = process.env.PORT || 5000;
+    const PORT =
+      process.env.PORT || 5000
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    const server = app.listen(
+      PORT,
+      () => {
+        console.log(
+          `Server running on http://localhost:${PORT}`
+        )
+      }
+    )
 
-//Handle unhandled promise reactions (db connection errors)
-process.on("unhandledRejection", (err) => {
-  console.error("Unhandled Rejection:", err);
-  server.close(async () => {
-    await disconnectDB();
-    process.exit(1);
-  });
-});
+    process.on(
+      'unhandledRejection',
+      async (error) => {
+        console.error(
+          'Unhandled Rejection:',
+          error
+        )
 
-process.on("uncaughtException", async (err) => {
-  console.error("Unhandled Exception:", err);
-  await disconnectDB();
-  process.exit(1);
-});
+        server.close(async () => {
+          await disconnectDB()
+          await disconnectRedis()
+          process.exit(1)
+        })
+      }
+    )
 
-process.on("SIGTERM", async () => {
-  console.error("SIGTERM received, shutting down gracefully");
-  server.close(async () => {
-    await disconnectDB();
-    process.exit(0);
-  });
-});
+    process.on(
+      'uncaughtException',
+      async (error) => {
+        console.error(
+          'Unhandled Exception:',
+          error
+        )
+
+        await disconnectDB()
+        await disconnectRedis()
+        process.exit(1)
+      }
+    )
+
+    process.on(
+      'SIGTERM',
+      async () => {
+        console.log(
+          'SIGTERM received, shutting down gracefully'
+        )
+
+        server.close(async () => {
+          await disconnectDB()
+          await disconnectRedis()
+          process.exit(0)
+        })
+      }
+    )
+  } catch (error) {
+    console.error(
+      'Failed to start server:',
+      error
+    )
+
+    await disconnectDB()
+    await disconnectRedis()
+
+    process.exit(1)
+  }
+}
+
+startServer()
