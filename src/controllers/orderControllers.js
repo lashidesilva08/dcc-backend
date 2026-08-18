@@ -1,12 +1,8 @@
-<<<<<<< HEAD
 import prisma from "../config/prisma.js";
 import { hydrateCart, clearCartItems } from "../services/cartService.js";
 import crypto from "crypto";
-=======
-import { PrismaClient } from "@prisma/client";
 import emailService from "../services/email.service.js";
 import notificationService from "../services/notification.service.js";
->>>>>>> 521154d24f1d5ba049bd54d07840634b59e3d621
 
 // Helper: generate a unique order number like DCC-20260810-A3X9
 function generateOrderNumber() {
@@ -16,7 +12,6 @@ function generateOrderNumber() {
     return `DCC-${datePart}-${randomPart}`;
 }
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 1. CHECKOUT (Create Order from Cart)
 //    POST /api/v1/orders/checkout
@@ -30,96 +25,6 @@ export const createOrder = async (req, res) => {
         if (!deliveryAddress) {
             return res.status(400).json({ success: false, message: "Delivery address is required." });
         }
-=======
-/**
- * Create Order
- * POST /api/orders
- */
-export const createOrder = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    // Get logged-in user
-    const user = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
-
-    /*
-     * TODO:
-     * Replace this section with your actual checkout/order creation logic.
-     *
-     * The important part is:
-     * after the real order is successfully created,
-     * call notificationService.orderPlaced().
-     */
-
-    const orderNumber = `ORD-${Date.now()}`;
-
-    // --------------------------------------------------
-    // TEMPORARY ORDER DATA
-    // Replace this with your actual Prisma order creation.
-    // --------------------------------------------------
-
-    const order = {
-      orderNumber,
-      totalAmount: req.body.total || 0,
-    };
-
-    // --------------------------------------------------
-    // SEND EMAIL
-    // --------------------------------------------------
-
-    try {
-      await emailService.sendOrderConfirmation(user, {
-        id: order.orderNumber,
-        total: order.totalAmount,
-      });
-
-      console.log("✅ Order confirmation email sent");
-    } catch (emailError) {
-      console.error(
-        "❌ Order confirmation email failed:",
-        emailError
-      );
-
-      // Do not fail the order because email failed
-    }
-
-    // --------------------------------------------------
-    // CREATE WEBSITE NOTIFICATION
-    // --------------------------------------------------
-
-    try {
-      await notificationService.orderPlaced(
-        user.id,
-        order.orderNumber
-      );
-
-      console.log("✅ Order notification created");
-    } catch (notificationError) {
-      console.error(
-        "❌ Order notification failed:",
-        notificationError
-      );
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: "Order placed successfully.",
-      orderId: order.orderNumber,
-    });
-  } catch (error) {
-    console.error("Create Order Error:", error);
->>>>>>> 521154d24f1d5ba049bd54d07840634b59e3d621
 
         // 1. Read cart from Redis and hydrate with live DB prices
         const { items, summary } = await hydrateCart(userId);
@@ -212,7 +117,6 @@ export const createOrder = async (req, res) => {
     }
 };
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 2. GET MY ORDERS
 //    GET /api/v1/orders/my-orders
