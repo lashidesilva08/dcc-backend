@@ -453,7 +453,7 @@ export const trackOrder = async (req, res) => {
 
 // Legacy alias kept for route compatibility
 export const checkout = createOrder;
-=======
+
 /**
  * Get My Orders
  * GET /api/orders/my-orders
@@ -850,4 +850,4 @@ export const trackOrder = async (req, res) => {
     });
   }
 };
->>>>>>> 521154d24f1d5ba049bd54d07840634b59e3d621
+
