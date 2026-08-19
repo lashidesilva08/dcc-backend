@@ -11,9 +11,8 @@
     "reset:delivery-demo": "node scripts/resetDeliveryDemoState.mjs",
     "test:delivery-contact": "node scripts/testDeliveryAndContact.mjs"
   },
-
   "prisma": {
-  "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js"
   },
   "keywords": [],
   "author": "",
@@ -33,11 +32,10 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.21.0",
-    "redis": "^6.0.0"
+    "redis": "^6.1.0"
   },
   "devDependencies": {
     "@prisma/client": "^6.19.3",
     "prisma": "^6.19.3"
   }
 }
-

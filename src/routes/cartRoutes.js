@@ -1,13 +1,61 @@
 import express from "express";
-import { getCart, addToCart, removeFromCart, updateCartItem, clearCart } from "../controllers/cartControllers.js";
 
-const router = express.Router();
+import {
+    getCart,
+    addToCart,
+    removeFromCart,
+    updateCartItem,
+    clearCart
+} from "../controllers/cartControllers.js";
 
-router.get("/", getCart);             // View cart
-router.post("/add", addToCart);       // Add item
-router.delete("/:id", removeFromCart); // Remove item
-router.put("/update/:id", updateCartItem); // Update item quantity
-router.delete("/clear", clearCart); // Clear cart
+import {
+    protect
+} from "../middleware/auth.js";
+
+
+const router =
+    express.Router();
+
+
+// All cart operations belong to
+// the authenticated buyer.
+router.use(protect);
+
+
+// View cart
+router.get(
+    "/",
+    getCart
+);
+
+
+// Add item
+router.post(
+    "/add",
+    addToCart
+);
+
+
+// IMPORTANT:
+// Static route must come before "/:id"
+router.delete(
+    "/clear",
+    clearCart
+);
+
+
+// Update quantity
+router.put(
+    "/update/:id",
+    updateCartItem
+);
+
+
+// Remove one cart line
+router.delete(
+    "/:id",
+    removeFromCart
+);
 
 
 export default router;
