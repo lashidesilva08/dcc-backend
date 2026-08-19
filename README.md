@@ -141,7 +141,7 @@ Create a `.env` file:
 
 ```env
 PORT=5000
-DATABASE_URL="postgresql://username:password@localhost:5432/digital_city_center"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/digital_city_center"
 NODE_ENV="development"
 REDIS_URL="redis://localhost:6379"
 JWT_SECRET=your_secret_key
@@ -159,6 +159,12 @@ SMTP_PASS=akdsqxgjznbsehrm
 MAIL_FROM=Digital City Center <tharzmt@gmail.com>
 
 FRONTEND_URL=http://localhost:5173
+
+# PayHere Payment Gateway (Sandbox)
+PAYHERE_MERCHANT_ID=1236278
+PAYHERE_MERCHANT_SECRET=Mjg3NzMwMzk1ODM2NzQ2MzUzODAzNTA1OTc1NjQzMzQ2NzQ5NTY0NQ==
+PAYHERE_SANDBOX=true
+
 ```
 
 ---
