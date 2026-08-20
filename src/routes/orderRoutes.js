@@ -1,13 +1,16 @@
 import express from "express";
 
 import {
-  getNotifications,
-  getUnreadNotifications,
-  unreadCount,
-  markAsRead,
-  markAllRead,
-  deleteNotification,
-} from "../controllers/notification.controller.js";
+  createOrder,
+  getMyOrders,
+  updateOrderStatus,
+  getSellerOrders,
+  getInvoice,
+  checkout,
+  getOrderById,
+  cancelOrder,
+  trackOrder,
+} from "../controllers/orderControllers.js";
 
 import { protect } from "../middleware/auth.middleware.js";
 
@@ -15,16 +18,31 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/", getNotifications);
+// Checkout
+router.post("/checkout", checkout);
 
-router.get("/unread", getUnreadNotifications);
+// Create order
+router.post("/", createOrder);
 
-router.get("/count", unreadCount);
+// Get logged-in user's orders
+router.get("/my-orders", getMyOrders);
 
-router.patch("/:id/read", markAsRead);
+// Seller orders
+router.get("/seller", getSellerOrders);
 
-router.patch("/read-all", markAllRead);
+// Get order by ID
+router.get("/:id", getOrderById);
 
-router.delete("/:id", deleteNotification);
+// Get invoice
+router.get("/:id/invoice", getInvoice);
+
+// Update order status
+router.patch("/:id/status", updateOrderStatus);
+
+// Cancel order
+router.patch("/:id/cancel", cancelOrder);
+
+// Track order
+router.get("/:id/track", trackOrder);
 
 export default router;
