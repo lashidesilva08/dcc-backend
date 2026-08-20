@@ -50,6 +50,23 @@ export const addToCart = async (req, res) => {
       color,
       size,
     })
+
+    try {
+  const item = cart.items[cart.items.length - 1];
+
+  await notificationService.cartAdded(
+    req.user.id,
+    item?.name || "Product",
+    item?.productId || productId
+  );
+
+  console.log("✅ Cart notification created");
+} catch (notificationError) {
+  console.error(
+    "❌ Cart notification failed:",
+    notificationError
+  );
+}
     // Create notification after successful cart addition
 try {
   const addedItem = cart.items.find(
@@ -76,7 +93,7 @@ try {
       cart: cart.items,
       items: cart.items,
       summary: cart.summary,
-    })
+    });
   } catch (error) {
     console.error('addToCart error:', error)
     return sendError(res, error)

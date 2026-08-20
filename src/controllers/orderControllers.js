@@ -163,50 +163,14 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    if (method === 'COD') {
-
-  const updatedOrder = await prisma.order.update({
-    where: {
-      id: orderId,
-    },
-    data: {
-      orderStatus: "PLACED",
-      paymentStatus: "PENDING",
-    },
-    include: {
-      user: true,
-    },
-  });
-
-  try {
-    await notificationService.orderPlaced(
-      updatedOrder.userId,
-      updatedOrder.orderNumber
-    );
-
-    await notificationService.create({
-      userId: updatedOrder.userId,
-      title: "Cash on Delivery Selected 💵",
-      message: `Your order #${updatedOrder.orderNumber} will be paid on delivery.`,
-      type: "PAYMENT",
-      link: `/orders/${updatedOrder.orderNumber}`,
-    });
-
-    console.log("✅ COD notifications created");
-
-  } catch (notificationError) {
-    console.error(
-      "❌ COD notification failed:",
-      notificationError
-    );
-  }
-
-  return res.status(200).json({
-    success: true,
-    message: "Order placed successfully via COD",
-    orderId: updatedOrder.id,
-  });
-}
+    const updatedOrder = await prisma.order.update({
+  where: {
+    id: Number(id),
+  },
+  data: {
+    orderStatus: status,
+  },
+});
 
     // --------------------------------------------------
     // SEND ORDER STATUS EMAIL
@@ -217,7 +181,7 @@ export const updateOrderStatus = async (req, res) => {
         order.user,
         {
           id: order.orderNumber,
-          status: order.orderStatus,
+          status,
         }
       );
 
@@ -460,7 +424,7 @@ export const cancelOrder = async (req, res) => {
         id: Number(id),
       },
       data: {
-        status: "CANCELLED",
+        orderStatus: "CANCELLED",
       },
     });
 
@@ -518,7 +482,7 @@ export const trackOrder = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      status: order.orderStatus,
+      Status: order.orderStatus,
     });
   } catch (error) {
     console.error("Track Order Error:", error);
@@ -526,6 +490,149 @@ export const trackOrder = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to track order.",
+    });
+  }
+};
+
+import notificationService from "../services/notification.service.js";
+
+/**
+ * GET /api/notifications
+ */
+export const getNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const notifications =
+      await notificationService.getUserNotifications(userId);
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("Get Notifications Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load notifications.",
+    });
+  }
+};
+
+/**
+ * GET /api/notifications/unread
+ */
+export const getUnreadNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const notifications =
+      await notificationService.getUnreadNotifications(userId);
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("Get Unread Notifications Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load unread notifications.",
+    });
+  }
+};
+
+/**
+ * GET /api/notifications/count
+ */
+export const unreadCount = async (req, res) => {
+  try {
+    const count =
+      await notificationService.unreadCount(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      unread: count,
+    });
+  } catch (error) {
+    console.error("Unread Count Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to count notifications.",
+    });
+  }
+};
+
+/**
+ * PATCH /api/notifications/:id/read
+ */
+export const markAsRead = async (req, res) => {
+  try {
+    await notificationService.markRead(
+      req.params.id,
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification marked as read.",
+    });
+  } catch (error) {
+    console.error("Mark Notification Read Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update notification.",
+    });
+  }
+};
+
+/**
+ * PATCH /api/notifications/read-all
+ */
+export const markAllRead = async (req, res) => {
+  try {
+    await notificationService.markAllRead(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "All notifications marked as read.",
+    });
+  } catch (error) {
+    console.error("Mark All Notifications Read Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update notifications.",
+    });
+  }
+};
+
+/**
+ * DELETE /api/notifications/:id
+ */
+export const deleteNotification = async (req, res) => {
+  try {
+    await notificationService.delete(
+      req.params.id,
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted.",
+    });
+  } catch (error) {
+    console.error("Delete Notification Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to delete notification.",
     });
   }
 };

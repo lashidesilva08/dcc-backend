@@ -1,15 +1,30 @@
 import express from "express";
-import { createOrder, getInvoice, getMyOrders, getSellerOrders, updateOrderStatus, getOrderById, cancelOrder,trackOrder } from "../controllers/orderControllers.js";
+
+import {
+  getNotifications,
+  getUnreadNotifications,
+  unreadCount,
+  markAsRead,
+  markAllRead,
+  deleteNotification,
+} from "../controllers/notification.controller.js";
+
+import { protect } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/checkout", createOrder);       // Buyer: Unified checkout
-router.get("/my-orders", getMyOrders);       // Buyer: Order history
-router.patch("/:id/status", updateOrderStatus); // Seller/Admin: Status update
-router.get("/:id/invoice", getInvoice);
-router.get("/:id", getOrderById);
-router.delete("/:id", cancelOrder);
-router.get("/track/:id", trackOrder);
-router.get("/seller-orders", getSellerOrders);
+router.use(protect);
+
+router.get("/", getNotifications);
+
+router.get("/unread", getUnreadNotifications);
+
+router.get("/count", unreadCount);
+
+router.patch("/:id/read", markAsRead);
+
+router.patch("/read-all", markAllRead);
+
+router.delete("/:id", deleteNotification);
 
 export default router;
