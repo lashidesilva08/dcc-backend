@@ -58,55 +58,105 @@ export const getFeaturedShops = async (req, res) => {
 //flashsale
 export const getActiveFlashSale = async (req, res) => {
   try {
+    const now = new Date()
     const flashSale = await prisma.flashSale.findFirst({
       where: {
         status: "active",
+        startTime: { lte: now },
+        endTime: { gte: now },
       },
       include: {
         items: {
           include: {
-            productVariant: { 
+            productVariant: {
               include: {
                 images: true,
-                listing: true 
-              }
-            }
-          }
-        }
-      }
+                listing: {
+                  include: {
+                    category: true,
+                    seller: {
+                      select: {
+                        id: true,
+                        shopName: true,
+                        shopUrl: true,
+                      },
+                    },
+                    reviews: {
+                      select: { rating: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!flashSale) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "No active flash sale found at the moment." 
+        message: "No active flash sale found at the moment.",
       });
     }
 
-    const formattedProducts = flashSale.items.map(item => {
-      const variant = item.productVariant; 
-      const listing = variant?.listing;
-      
-      const mainImage = variant?.images?.find(img => img.isMain === true) || variant?.images?.[0];
-      const productImage = mainImage ? mainImage.url : "";
+    const formattedProducts = flashSale.items
+      .map((item) => {
+        const variant = item.productVariant;
+        const listing = variant?.listing;
+        if (!listing || listing.status !== "active" || variant?.status !== "active") {
+          return null;
+        }
 
-      const originalPrice = variant?.price || item.flashPrice;
-      const discountPercentage = originalPrice > item.flashPrice
-        ? `${Math.round(((originalPrice - item.flashPrice) / originalPrice) * 100)}% OFF`
-        : "SALE";
+        const mainImage =
+          variant?.images?.find((img) => img.isMain === true) || variant?.images?.[0];
+        const productImage = mainImage ? mainImage.url : "";
 
-      return {
-        id: item.id,
-        variantId: item.variantId,
-        title: listing?.title || "Unknown Product",
-        image: productImage,
-        flashPrice: item.flashPrice,
-        originalPrice: originalPrice,
-        discountPercentage: discountPercentage,
-        stockRemaining: item.flashStock || 0,
-        soldCount: item.soldCount || 0
-      };
-    });
+        const originalPrice = Number(variant?.price || item.flashPrice) || 0;
+        const flashPrice = Number(item.flashPrice) || originalPrice;
+        const discountPercent =
+          originalPrice > flashPrice
+            ? Math.round(((originalPrice - flashPrice) / originalPrice) * 100)
+            : 0;
+
+        const ratings = (listing.reviews || []).map((r) => Number(r.rating) || 0);
+        const rating =
+          ratings.length > 0
+            ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
+            : 4.5;
+
+        const categoryName = listing.category?.name || "Marketplace";
+        const categorySlug = categoryName.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "");
+
+        return {
+          id: listing.id,
+          listingId: listing.id,
+          productId: listing.id,
+          variantId: item.variantId,
+          title: listing.title || "Unknown Product",
+          name: listing.title || "Unknown Product",
+          brand: listing.seller?.shopName || categoryName,
+          description: listing.description || "",
+          image: productImage,
+          images: productImage ? [productImage] : [],
+          price: flashPrice,
+          flashPrice,
+          originalPrice,
+          discountPercent,
+          discountPercentage:
+            discountPercent > 0 ? `${discountPercent}% OFF` : "SALE",
+          stock: Number(item.flashStock ?? variant?.stock ?? 0),
+          stockRemaining: Number(item.flashStock ?? variant?.stock ?? 0),
+          soldCount: Number(item.soldCount || 0),
+          rating: Number(rating.toFixed(1)),
+          reviewCount: ratings.length,
+          categorySlug,
+          categoryLabel: categoryName,
+          seller: listing.seller?.shopName || "Marketplace Seller",
+          shopId: listing.seller?.shopUrl || listing.seller?.id || null,
+        };
+      })
+      .filter(Boolean);
 
     return res.status(200).json({
       success: true,
@@ -115,15 +165,14 @@ export const getActiveFlashSale = async (req, res) => {
         id: flashSale.id,
         title: flashSale.title,
         endTime: flashSale.endTime,
-        products: formattedProducts 
-      }
+        products: formattedProducts,
+      },
     });
-
   } catch (error) {
     console.error("Error fetching active flash sale:", error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message || "Internal Server Error" 
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Internal Server Error",
     });
   }
 };
