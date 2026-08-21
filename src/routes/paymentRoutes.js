@@ -2,6 +2,7 @@ import express from "express";
 import {
     initiatePayment,
     handlePaymentWebhook,
+    handleMintWebhook,
     getPaymentStatus,
     initiateRefund,
 } from "../controllers/paymentControllers.js";
@@ -16,6 +17,10 @@ router.post("/initiate", protect, initiatePayment);
 // POST /api/v1/payments/webhook/payhere
 // NO AUTH — PayHere servers call this directly with the payment notification
 router.post("/webhook/payhere", handlePaymentWebhook);
+
+// POST /api/v1/payments/webhook/mint
+// NO AUTH — Mint servers call this directly
+router.post("/webhook/mint", handleMintWebhook);
 
 // GET /api/v1/payments/status/:orderId
 // Auth required — frontend polls this after PayHere redirect to check if payment succeeded

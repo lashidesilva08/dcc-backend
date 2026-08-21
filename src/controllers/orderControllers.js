@@ -1,8 +1,5 @@
 import prisma from "../config/prisma.js";
-import { hydrateCart, clearCartItems } from "../services/cartService.js";
 import crypto from "crypto";
-import emailService from "../services/email.service.js";
-import notificationService from "../services/notification.service.js";
 
 // Helper: generate a unique order number like DCC-20260810-A3X9
 function generateOrderNumber() {
@@ -13,27 +10,78 @@ function generateOrderNumber() {
 }
 
 // ─────────────────────────────────────────────
-// 1. CHECKOUT (Create Order from Cart)
+// 1. CHECKOUT (Create Order from Payload Items)
 //    POST /api/v1/orders/checkout
 //    Auth: Required
+//
+//    Expects req.body.items: [{ variantId, quantity }]
+//    Prices and seller info are resolved server-side from DB.
 // ─────────────────────────────────────────────
 export const createOrder = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { deliveryAddress, notes } = req.body;
+        const { items: rawItems, deliveryAddress, notes } = req.body;
 
         if (!deliveryAddress) {
             return res.status(400).json({ success: false, message: "Delivery address is required." });
         }
 
-        // 1. Read cart from Redis and hydrate with live DB prices
-        const { items, summary } = await hydrateCart(userId);
-
-        if (!items || items.length === 0) {
-            return res.status(400).json({ success: false, message: "Your cart is empty. Please add items before checking out." });
+        // 1. Validate payload items
+        if (!Array.isArray(rawItems) || rawItems.length === 0) {
+            return res.status(400).json({ success: false, message: "No items provided. Please send an items array in the request body." });
         }
 
-        // 2. Check stock availability for all items
+        const variantIds = rawItems.map((i) => Number(i.variantId)).filter((id) => Number.isInteger(id) && id > 0);
+        if (variantIds.length !== rawItems.length) {
+            return res.status(400).json({ success: false, message: "Each item must have a valid variantId." });
+        }
+
+        // 2. Hydrate items from DB (fetch live prices, stock, seller info)
+        const variants = await prisma.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            include: {
+                listing: {
+                    include: {
+                        seller: { select: { id: true, shopName: true } },
+                    },
+                },
+            },
+        });
+
+        const variantMap = new Map(variants.map((v) => [v.id, v]));
+
+        const items = [];
+        for (const raw of rawItems) {
+            const variantId = Number(raw.variantId);
+            const quantity = Math.max(1, Math.floor(Number(raw.quantity) || 1));
+            const variant = variantMap.get(variantId);
+
+            if (!variant) {
+                return res.status(400).json({ success: false, message: `Variant ID ${variantId} not found.` });
+            }
+            if (variant.status !== "active") {
+                return res.status(400).json({ success: false, message: `Variant "${variant.sku || variantId}" is not available.` });
+            }
+            if (variant.listing?.status !== "active") {
+                return res.status(400).json({ success: false, message: `Product "${variant.listing?.title || variantId}" is not available.` });
+            }
+
+            const unitPrice = Number(variant.price) || 0;
+            const stock = Number(variant.stock) || 0;
+            const sellerId = variant.listing?.seller?.id || null;
+
+            items.push({
+                variantId,
+                quantity,
+                unitPrice,
+                lineTotal: unitPrice * quantity,
+                stock,
+                name: variant.listing?.title || "Product",
+                sellerId,
+            });
+        }
+
+        // 3. Check stock availability for all items
         for (const item of items) {
             if (item.stock < item.quantity) {
                 return res.status(400).json({
@@ -43,17 +91,24 @@ export const createOrder = async (req, res) => {
             }
         }
 
+        // 4. Compute order totals
+        const FREE_DELIVERY_THRESHOLD = 15000;
+        const DEFAULT_DELIVERY_FEE = 350;
+        const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+        const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DEFAULT_DELIVERY_FEE;
+        const total = subtotal + deliveryFee;
+
         const orderNumber = generateOrderNumber();
 
-        // 3. Create order atomically in a Prisma transaction
+        // 5. Create order atomically in a Prisma transaction
         const order = await prisma.$transaction(async (tx) => {
             // Create the Order
             const newOrder = await tx.order.create({
                 data: {
                     userId,
                     orderNumber,
-                    totalAmount: summary.total,
-                    deliveryFee: summary.deliveryFee,
+                    totalAmount: total,
+                    deliveryFee,
                     paymentMethod: "PENDING", // Will be set when buyer initiates payment
                     paymentStatus: "pending",
                     orderStatus: "placed",
@@ -89,7 +144,7 @@ export const createOrder = async (req, res) => {
                     orderId: newOrder.id,
                     transactionReference: `TXN-${orderNumber}`,
                     paymentGateway: "PENDING",
-                    amount: summary.total,
+                    amount: total,
                     currency: "LKR",
                     status: "pending",
                 },
@@ -98,16 +153,13 @@ export const createOrder = async (req, res) => {
             return newOrder;
         });
 
-        // 4. Clear the cart from Redis after successful order creation
-        await clearCartItems(userId);
-
         return res.status(201).json({
             success: true,
             message: "Order placed successfully. Proceed to payment.",
             orderId: order.id,
             orderNumber: order.orderNumber,
-            totalAmount: summary.total,
-            deliveryFee: summary.deliveryFee,
+            totalAmount: total,
+            deliveryFee,
             itemCount: items.length,
         });
 
@@ -451,403 +503,4 @@ export const trackOrder = async (req, res) => {
     }
 };
 
-// Legacy alias kept for route compatibility
-export const checkout = createOrder;
-
-/**
- * Get My Orders
- * GET /api/orders/my-orders
- */
-export const getMyOrders = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const orders = await prisma.order.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return res.status(200).json({
-      success: true,
-      orders,
-    });
-  } catch (error) {
-    console.error("Get My Orders Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load orders.",
-    });
-  }
-};
-
-/**
- * Update Order Status
- * PATCH /api/orders/:id/status
- */
-export const updateOrderStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: "Order status is required.",
-      });
-    }
-
-    const order = await prisma.order.findUnique({
-      where: {
-        id: Number(id),
-      },
-      include: {
-        user: true,
-      },
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found.",
-      });
-    }
-
-    const updatedOrder = await prisma.order.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        status,
-      },
-      include: {
-        user: true,
-      },
-    });
-
-    // --------------------------------------------------
-    // SEND ORDER STATUS EMAIL
-    // --------------------------------------------------
-
-    try {
-      await emailService.sendOrderStatus(
-        order.user,
-        {
-          id: order.orderNumber,
-          status,
-        }
-      );
-
-      console.log("✅ Order status email sent");
-    } catch (emailError) {
-      console.error(
-        "❌ Order status email failed:",
-        emailError
-      );
-    }
-
-    // --------------------------------------------------
-    // CREATE ORDER STATUS NOTIFICATION
-    // --------------------------------------------------
-
-    try {
-      await notificationService.orderStatus(
-        order.user.id,
-        order.orderNumber,
-        status
-      );
-
-      console.log("✅ Order status notification created");
-    } catch (notificationError) {
-      console.error(
-        "❌ Order status notification failed:",
-        notificationError
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: `Order ${id} status updated to ${status}`,
-      order: updatedOrder,
-    });
-  } catch (error) {
-    console.error("Update Order Status Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update order status.",
-    });
-  }
-};
-
-/**
- * Get Seller Orders
- * GET /api/orders/seller
- */
-export const getSellerOrders = async (req, res) => {
-  try {
-    return res.status(200).json({
-      success: true,
-      message: "Specific shop orders for seller",
-    });
-  } catch (error) {
-    console.error("Get Seller Orders Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-};
-
-/**
- * Get Invoice
- * GET /api/orders/:id/invoice
- */
-export const getInvoice = async (req, res) => {
-  try {
-    return res.status(200).json({
-      success: true,
-      message: "Invoice PDF link generated",
-      downloadUrl: "http://...",
-    });
-  } catch (error) {
-    console.error("Get Invoice Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to generate invoice.",
-    });
-  }
-};
-
-/**
- * Checkout
- * POST /api/orders/checkout
- */
-export const checkout = async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    const user = await prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found.",
-      });
-    }
-
-    /*
-     * IMPORTANT:
-     * Put your existing real checkout/order creation
-     * logic here.
-     *
-     * After creating the real order, use:
-     *
-     * const order = await prisma.order.create(...)
-     */
-
-    const orderNumber = `ORD-${Date.now()}`;
-
-    // TEMPORARY until your real checkout logic is connected
-    const order = {
-      orderNumber,
-      totalAmount: req.body.total || 0,
-    };
-
-    // --------------------------------------------------
-    // EMAIL
-    // --------------------------------------------------
-
-    try {
-      await emailService.sendOrderConfirmation(user, {
-        id: order.orderNumber,
-        total: order.totalAmount,
-      });
-
-      console.log("✅ Checkout confirmation email sent");
-    } catch (emailError) {
-      console.error(
-        "❌ Checkout email failed:",
-        emailError
-      );
-    }
-
-    // --------------------------------------------------
-    // WEBSITE NOTIFICATION
-    // --------------------------------------------------
-
-    try {
-      await notificationService.orderPlaced(
-        user.id,
-        order.orderNumber
-      );
-
-      console.log("✅ Checkout notification created");
-    } catch (notificationError) {
-      console.error(
-        "❌ Checkout notification failed:",
-        notificationError
-      );
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: "Order placed successfully.",
-      orderId: order.orderNumber,
-    });
-  } catch (error) {
-    console.error("Checkout Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to place order.",
-    });
-  }
-};
-
-/**
- * Get Order By ID
- * GET /api/orders/:id
- */
-export const getOrderById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const order = await prisma.order.findUnique({
-      where: {
-        id: Number(id),
-      },
-      include: {
-        user: true,
-      },
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found.",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      order,
-    });
-  } catch (error) {
-    console.error("Get Order Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to retrieve order.",
-    });
-  }
-};
-
-/**
- * Cancel Order
- * PATCH /api/orders/:id/cancel
- */
-export const cancelOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    const order = await prisma.order.findFirst({
-      where: {
-        id: Number(id),
-        userId,
-      },
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found.",
-      });
-    }
-
-    const updatedOrder = await prisma.order.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        status: "CANCELLED",
-      },
-    });
-
-    // Create notification
-    try {
-      await notificationService.orderStatus(
-        userId,
-        order.orderNumber,
-        "CANCELLED"
-      );
-
-      console.log("✅ Order cancellation notification created");
-    } catch (notificationError) {
-      console.error(
-        "❌ Cancellation notification failed:",
-        notificationError
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Order cancelled.",
-      order: updatedOrder,
-    });
-  } catch (error) {
-    console.error("Cancel Order Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to cancel order.",
-    });
-  }
-};
-
-/**
- * Track Order
- * GET /api/orders/:id/track
- */
-export const trackOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const order = await prisma.order.findUnique({
-      where: {
-        id: Number(id),
-      },
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found.",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      status: order.status,
-    });
-  } catch (error) {
-    console.error("Track Order Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to track order.",
-    });
-  }
-};
 

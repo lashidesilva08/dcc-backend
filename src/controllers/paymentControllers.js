@@ -4,6 +4,10 @@ import {
     verifyWebhookHash,
     getPayHereCheckoutParams,
 } from "../services/payhere.service.js";
+import {
+    getMintCheckoutParams,
+    verifyMintWebhookHash,
+} from "../services/mint.service.js";
 
 // ─────────────────────────────────────────────
 // 1. INITIATE PAYMENT
@@ -18,7 +22,7 @@ export const initiatePayment = async (req, res) => {
             return res.status(400).json({ success: false, message: "orderId and method are required." });
         }
 
-        const allowedMethods = ["COD", "PAYHERE"];
+        const allowedMethods = ["COD", "PAYHERE", "MINT"];
         if (!allowedMethods.includes(method.toUpperCase())) {
             return res.status(400).json({ success: false, message: `Payment method must be one of: ${allowedMethods.join(", ")}` });
         }
@@ -117,6 +121,39 @@ export const initiatePayment = async (req, res) => {
                 success: true,
                 method: "PAYHERE",
                 message: "Checkout params ready. Submit to PayHere.",
+                checkoutParams,
+            });
+        }
+
+        // ─── Mint Flow ────────────────────────────────────────────────
+        if (normalizedMethod === "MINT") {
+            const appId = process.env.MINT_APP_ID;
+
+            if (!appId) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Mint is not configured. Please contact support.",
+                });
+            }
+
+            // Fetch full user details for checkout form
+            const user = await prisma.user.findUnique({
+                where: { id: req.user.id },
+                select: { id: true, name: true, email: true, phone: true },
+            });
+
+            // Update payment method on the order
+            await prisma.order.update({
+                where: { id: order.id },
+                data: { paymentMethod: "MINT" },
+            });
+
+            const checkoutParams = getMintCheckoutParams(order, user);
+
+            return res.status(200).json({
+                success: true,
+                method: "MINT",
+                message: "Checkout params ready. Submit to Mint.",
                 checkoutParams,
             });
         }
@@ -378,5 +415,100 @@ export const initiateRefund = async (req, res) => {
     } catch (error) {
         console.error("initiateRefund error:", error);
         return res.status(500).json({ success: false, message: "Refund processing failed.", error: error.message });
+    }
+};
+
+// ─────────────────────────────────────────────
+// 5. MINT WEBHOOK (Server Notification)
+//    POST /api/v1/payments/webhook/mint
+//    Auth: NONE — Mint servers call this directly
+// ─────────────────────────────────────────────
+export const handleMintWebhook = async (req, res) => {
+    try {
+        const paymentData = req.body;
+        console.log("[Mint Webhook] Received:", paymentData);
+
+        const appSecret = process.env.MINT_APP_SECRET;
+
+        // 1. Verify the webhook signature
+        const isVerified = verifyMintWebhookHash(paymentData, appSecret);
+
+        if (!isVerified) {
+            console.error("[Mint Webhook] Hash verification FAILED. Possible tampered request.");
+            return res.status(400).send("Hash verification failed.");
+        }
+
+        const orderId = Number(paymentData.order_id);
+        const status = paymentData.status; // assume "success", "failed", "cancelled"
+        const mintPaymentId = paymentData.transaction_id || paymentData.payment_id;
+
+        if (status === "success" || status === "paid") {
+            // Payment SUCCESS
+            await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "paid",
+                        orderStatus: "confirmed",
+                    },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: mintPaymentId || `MINT-${orderId}`,
+                        paymentGateway: "MINT",
+                        amount: parseFloat(paymentData.amount),
+                        currency: paymentData.currency || "LKR",
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                    update: {
+                        transactionReference: mintPaymentId || `MINT-${orderId}`,
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                }),
+            ]);
+
+            console.log(`[Mint Webhook] ✅ Order #${orderId} marked as PAID.`);
+        } else {
+            // Failed or Cancelled
+            const failedStatus = status === "cancelled" ? "cancelled" : "failed";
+
+            await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: { paymentStatus: failedStatus },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: mintPaymentId || `MINT-FAIL-${orderId}`,
+                        paymentGateway: "MINT",
+                        amount: parseFloat(paymentData.amount) || 0,
+                        currency: paymentData.currency || "LKR",
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                    update: {
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                }),
+            ]);
+
+            console.log(`[Mint Webhook] ❌ Order #${orderId} payment ${failedStatus.toUpperCase()}.`);
+        }
+
+        // Mint requires a 200 OK response
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("[Mint Webhook] Error:", error);
+        res.status(200).send("OK");
     }
 };
