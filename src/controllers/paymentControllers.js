@@ -8,6 +8,8 @@ import {
     getMintCheckoutParams,
     verifyMintWebhookHash,
 } from "../services/mint.service.js";
+import emailService from "../services/email.service.js";
+
 
 // ─────────────────────────────────────────────
 // 1. INITIATE PAYMENT
@@ -30,7 +32,7 @@ export const initiatePayment = async (req, res) => {
         // Fetch order and verify it belongs to the logged-in user
         const order = await prisma.order.findUnique({
             where: { id: Number(orderId) },
-            include: { transactions: true },
+            include: { transactions: true, user: true },
         });
 
         if (!order) {
@@ -74,6 +76,12 @@ export const initiatePayment = async (req, res) => {
                     },
                 }),
             ]);
+
+            // Send order confirmation email asynchronously
+            emailService.sendOrderConfirmation(order.user, {
+                id: order.orderNumber,
+                total: order.totalAmount,
+            }).catch((err) => console.error("Error sending COD order confirmation email:", err));
 
             return res.status(200).json({
                 success: true,
@@ -199,12 +207,15 @@ export const handlePaymentWebhook = async (req, res) => {
 
         if (statusCode === 2) {
             // Payment SUCCESS — update order and transaction
-            await prisma.$transaction([
+            const [updatedOrder] = await prisma.$transaction([
                 prisma.order.update({
                     where: { id: orderId },
                     data: {
                         paymentStatus: "paid",
                         orderStatus: "confirmed",
+                    },
+                    include: {
+                        user: true,
                     },
                 }),
                 prisma.transaction.upsert({
@@ -227,6 +238,12 @@ export const handlePaymentWebhook = async (req, res) => {
                     },
                 }),
             ]);
+
+            // Send order confirmation email asynchronously
+            emailService.sendOrderConfirmation(updatedOrder.user, {
+                id: updatedOrder.orderNumber,
+                total: updatedOrder.totalAmount,
+            }).catch((err) => console.error("Error sending PayHere order confirmation email:", err));
 
             console.log(`[PayHere Webhook] ✅ Order #${orderId} marked as PAID.`);
 
@@ -444,12 +461,15 @@ export const handleMintWebhook = async (req, res) => {
 
         if (status === "success" || status === "paid") {
             // Payment SUCCESS
-            await prisma.$transaction([
+            const [updatedOrder] = await prisma.$transaction([
                 prisma.order.update({
                     where: { id: orderId },
                     data: {
                         paymentStatus: "paid",
                         orderStatus: "confirmed",
+                    },
+                    include: {
+                        user: true,
                     },
                 }),
                 prisma.transaction.upsert({
@@ -472,6 +492,12 @@ export const handleMintWebhook = async (req, res) => {
                     },
                 }),
             ]);
+
+            // Send order confirmation email asynchronously
+            emailService.sendOrderConfirmation(updatedOrder.user, {
+                id: updatedOrder.orderNumber,
+                total: updatedOrder.totalAmount,
+            }).catch((err) => console.error("Error sending Mint order confirmation email:", err));
 
             console.log(`[Mint Webhook] ✅ Order #${orderId} marked as PAID.`);
         } else {

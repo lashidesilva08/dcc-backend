@@ -1,5 +1,7 @@
 import prisma from "../config/prisma.js";
 import crypto from "crypto";
+import emailService from "../services/email.service.js";
+
 
 // Helper: generate a unique order number like DCC-20260810-A3X9
 function generateOrderNumber() {
@@ -20,7 +22,7 @@ function generateOrderNumber() {
 export const createOrder = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { items: rawItems, deliveryAddress, notes } = req.body;
+        const { items: rawItems, deliveryAddress, notes, paymentMethod } = req.body;
 
         if (!deliveryAddress) {
             return res.status(400).json({ success: false, message: "Delivery address is required." });
@@ -109,7 +111,7 @@ export const createOrder = async (req, res) => {
                     orderNumber,
                     totalAmount: total,
                     deliveryFee,
-                    paymentMethod: "PENDING", // Will be set when buyer initiates payment
+                    paymentMethod: paymentMethod === "COD" ? "COD" : "PENDING",
                     paymentStatus: "pending",
                     orderStatus: "placed",
                     deliveryAddress,
@@ -127,6 +129,7 @@ export const createOrder = async (req, res) => {
                 },
                 include: {
                     orderItems: true,
+                    user: true,
                 },
             });
 
@@ -142,8 +145,8 @@ export const createOrder = async (req, res) => {
             await tx.transaction.create({
                 data: {
                     orderId: newOrder.id,
-                    transactionReference: `TXN-${orderNumber}`,
-                    paymentGateway: "PENDING",
+                    transactionReference: paymentMethod === "COD" ? `COD-${orderNumber}` : `TXN-${orderNumber}`,
+                    paymentGateway: paymentMethod === "COD" ? "COD" : "PENDING",
                     amount: total,
                     currency: "LKR",
                     status: "pending",
@@ -152,6 +155,14 @@ export const createOrder = async (req, res) => {
 
             return newOrder;
         });
+
+        // Send order confirmation email asynchronously for COD orders
+        if (paymentMethod === "COD" && order.user) {
+            emailService.sendOrderConfirmation(order.user, {
+                id: order.orderNumber,
+                total: order.totalAmount,
+            }).catch((err) => console.error("Error sending COD checkout order confirmation email:", err));
+        }
 
         return res.status(201).json({
             success: true,
