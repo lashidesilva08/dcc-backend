@@ -1,0 +1,4 @@
+{
+  "prisma.prismaFmtBinPath": "./node_modules/prisma/query-engine-windows.dll.node",
+  "prisma.pinToPrisma6": true
+}
