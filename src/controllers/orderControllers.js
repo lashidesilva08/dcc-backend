@@ -164,16 +164,13 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     const updatedOrder = await prisma.order.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        status,
-      },
-      include: {
-        user: true,
-      },
-    });
+  where: {
+    id: Number(id),
+  },
+  data: {
+    orderStatus: status,
+  },
+});
 
     // --------------------------------------------------
     // SEND ORDER STATUS EMAIL
@@ -279,6 +276,43 @@ export const checkout = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    const {
+      items,
+      deliveryAddress,
+      deliveryMethod,
+      paymentMethod,
+      notes,
+    } = req.body;
+
+    // --------------------------------------------------
+    // VALIDATION
+    // --------------------------------------------------
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cart is empty.",
+      });
+    }
+
+    if (!deliveryAddress) {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery address is required.",
+      });
+    }
+
+    if (!paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment method is required.",
+      });
+    }
+
+    // --------------------------------------------------
+    // GET USER
+    // --------------------------------------------------
+
     const user = await prisma.user.findUnique({
       where: {
         id: userId,
@@ -292,35 +326,217 @@ export const checkout = async (req, res) => {
       });
     }
 
-    /*
-     * IMPORTANT:
-     * Put your existing real checkout/order creation
-     * logic here.
-     *
-     * After creating the real order, use:
-     *
-     * const order = await prisma.order.create(...)
-     */
+    // --------------------------------------------------
+    // GET PRODUCT VARIANTS
+    // --------------------------------------------------
+
+    const variantIds = items.map((item) =>
+      Number(item.variantId)
+    );
+
+    const variants = await prisma.productVariant.findMany({
+      where: {
+        id: {
+          in: variantIds,
+        },
+      },
+      include: {
+        listing: {
+          include: {
+            seller: true,
+          },
+        },
+      },
+    });
+
+    // Make sure every requested variant exists
+    if (variants.length !== variantIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more products are no longer available.",
+      });
+    }
+
+    // --------------------------------------------------
+    // VALIDATE STOCK + CALCULATE TOTAL
+    // --------------------------------------------------
+
+    let subtotal = 0;
+
+    const orderItemsData = [];
+
+    for (const item of items) {
+      const variantId = Number(item.variantId);
+      const quantity = Number(item.quantity);
+
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid product quantity.",
+        });
+      }
+
+      const variant = variants.find(
+        (v) => v.id === variantId
+      );
+
+      if (!variant) {
+        return res.status(400).json({
+          success: false,
+          message: `Product variant ${variantId} not found.`,
+        });
+      }
+
+      if (variant.status !== "active") {
+        return res.status(400).json({
+          success: false,
+          message: `${variant.listing.title} is no longer available.`,
+        });
+      }
+
+      if (variant.stock < quantity) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${variant.listing.title}. Available stock: ${variant.stock}.`,
+        });
+      }
+
+      const itemSubtotal =
+        variant.price * quantity;
+
+      subtotal += itemSubtotal;
+
+      orderItemsData.push({
+        variantId: variant.id,
+        sellerId: variant.listing.sellerId,
+        quantity,
+        unitPrice: variant.price,
+        subtotal: itemSubtotal,
+      });
+    }
+
+    // --------------------------------------------------
+    // DELIVERY FEE
+    // --------------------------------------------------
+
+    // Adjust this according to your actual delivery rules.
+    const deliveryFee =
+      deliveryMethod === "pickup"
+        ? 0
+        : 300;
+
+    const totalAmount =
+      subtotal + deliveryFee;
+
+    // --------------------------------------------------
+    // ORDER NUMBER
+    // --------------------------------------------------
 
     const orderNumber = `ORD-${Date.now()}`;
 
-    // TEMPORARY until your real checkout logic is connected
-    const order = {
-      orderNumber,
-      totalAmount: req.body.total || 0,
-    };
+    // --------------------------------------------------
+    // CREATE ORDER + ORDER ITEMS
+    // --------------------------------------------------
+
+    const order = await prisma.$transaction(
+      async (tx) => {
+        const createdOrder =
+          await tx.order.create({
+            data: {
+              userId,
+              orderNumber,
+              totalAmount,
+              deliveryFee,
+              paymentMethod,
+              paymentStatus:
+                paymentMethod === "COD"
+                  ? "pending"
+                  : "pending",
+              orderStatus: "placed",
+              deliveryAddress,
+              notes: notes || null,
+
+              orderItems: {
+                create: orderItemsData,
+              },
+            },
+
+            include: {
+              orderItems: true,
+            },
+          });
+
+        // ------------------------------------------------
+        // REDUCE STOCK
+        // ------------------------------------------------
+
+        for (const item of items) {
+          const variantId =
+            Number(item.variantId);
+
+          const quantity =
+            Number(item.quantity);
+
+          await tx.productVariant.update({
+            where: {
+              id: variantId,
+            },
+            data: {
+              stock: {
+                decrement: quantity,
+              },
+            },
+          });
+        }
+
+        // ------------------------------------------------
+        // UPDATE LISTING SOLD COUNT
+        // ------------------------------------------------
+
+        for (const item of items) {
+          const variant =
+            variants.find(
+              (v) =>
+                v.id ===
+                Number(item.variantId)
+            );
+
+          if (variant) {
+            await tx.listing.update({
+              where: {
+                id: variant.listingId,
+              },
+              data: {
+                sold: {
+                  increment: Number(
+                    item.quantity
+                  ),
+                },
+              },
+            });
+          }
+        }
+
+        return createdOrder;
+      }
+    );
 
     // --------------------------------------------------
-    // EMAIL
+    // SEND ORDER CONFIRMATION EMAIL
     // --------------------------------------------------
 
     try {
-      await emailService.sendOrderConfirmation(user, {
-        id: order.orderNumber,
-        total: order.totalAmount,
-      });
+      await emailService.sendOrderConfirmation(
+        user,
+        {
+          id: order.orderNumber,
+          total: order.totalAmount,
+        }
+      );
 
-      console.log("✅ Checkout confirmation email sent");
+      console.log(
+        "✅ Checkout confirmation email sent"
+      );
     } catch (emailError) {
       console.error(
         "❌ Checkout email failed:",
@@ -329,7 +545,7 @@ export const checkout = async (req, res) => {
     }
 
     // --------------------------------------------------
-    // WEBSITE NOTIFICATION
+    // CREATE WEBSITE NOTIFICATION
     // --------------------------------------------------
 
     try {
@@ -338,7 +554,9 @@ export const checkout = async (req, res) => {
         order.orderNumber
       );
 
-      console.log("✅ Checkout notification created");
+      console.log(
+        "✅ Checkout notification created"
+      );
     } catch (notificationError) {
       console.error(
         "❌ Checkout notification failed:",
@@ -346,17 +564,38 @@ export const checkout = async (req, res) => {
       );
     }
 
+    // --------------------------------------------------
+    // RESPONSE
+    // --------------------------------------------------
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully.",
-      orderId: order.orderNumber,
+
+      data: {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        subtotal,
+        deliveryFee: order.deliveryFee,
+        totalAmount: order.totalAmount,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
+      },
     });
   } catch (error) {
-    console.error("Checkout Error:", error);
+    console.error(
+      "Checkout Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
       message: "Failed to place order.",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -427,7 +666,7 @@ export const cancelOrder = async (req, res) => {
         id: Number(id),
       },
       data: {
-        status: "CANCELLED",
+        orderStatus: "CANCELLED",
       },
     });
 
@@ -485,7 +724,7 @@ export const trackOrder = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      status: order.status,
+      Status: order.orderStatus,
     });
   } catch (error) {
     console.error("Track Order Error:", error);
@@ -493,6 +732,149 @@ export const trackOrder = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to track order.",
+    });
+  }
+};
+
+
+
+/**
+ * GET /api/notifications
+ */
+export const getNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const notifications =
+      await notificationService.getUserNotifications(userId);
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("Get Notifications Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load notifications.",
+    });
+  }
+};
+
+/**
+ * GET /api/notifications/unread
+ */
+export const getUnreadNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const notifications =
+      await notificationService.getUnreadNotifications(userId);
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("Get Unread Notifications Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load unread notifications.",
+    });
+  }
+};
+
+/**
+ * GET /api/notifications/count
+ */
+export const unreadCount = async (req, res) => {
+  try {
+    const count =
+      await notificationService.unreadCount(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      unread: count,
+    });
+  } catch (error) {
+    console.error("Unread Count Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to count notifications.",
+    });
+  }
+};
+
+/**
+ * PATCH /api/notifications/:id/read
+ */
+export const markAsRead = async (req, res) => {
+  try {
+    await notificationService.markRead(
+      req.params.id,
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification marked as read.",
+    });
+  } catch (error) {
+    console.error("Mark Notification Read Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update notification.",
+    });
+  }
+};
+
+/**
+ * PATCH /api/notifications/read-all
+ */
+export const markAllRead = async (req, res) => {
+  try {
+    await notificationService.markAllRead(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "All notifications marked as read.",
+    });
+  } catch (error) {
+    console.error("Mark All Notifications Read Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update notifications.",
+    });
+  }
+};
+
+/**
+ * DELETE /api/notifications/:id
+ */
+export const deleteNotification = async (req, res) => {
+  try {
+    await notificationService.delete(
+      req.params.id,
+      req.user.id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted.",
+    });
+  } catch (error) {
+    console.error("Delete Notification Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to delete notification.",
     });
   }
 };

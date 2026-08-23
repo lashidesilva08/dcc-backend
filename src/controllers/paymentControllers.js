@@ -1,101 +1,504 @@
 import { PrismaClient } from "@prisma/client";
+import notificationService from "../services/notification.service.js";
+
 const prisma = new PrismaClient();
 
-// 1. Initiate Payment
+/**
+ * 1. Initiate Payment
+ *
+ * POST /api/v1/payments/initiate
+ */
 export const initiatePayment = async (req, res) => {
-    try {
-        const { orderId, method } = req.body; // methods: 'PAYHERE', 'KOKO', 'COD', etc.
+  try {
+    const { orderId, method } = req.body;
 
-        // 1. Fetch the order without checking who owns it
-        const order = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: { orderItems: true }
-        });
-
-        if (!order) {
-            return res.status(404).json({ error: "Order not found" });
-        }
-
-        // 2. Handle Cash on Delivery
-        if (method === 'COD') {
-            await prisma.order.update({
-                where: { id: orderId },
-                data: { status: 'PLACED', paymentStatus: 'PENDING' }
-            });
-            return res.status(200).json({ message: "Order placed successfully via COD" });
-        }
-
-        // 3. Handle Online Gateway (PayHere)
-        return res.status(200).json({
-            gatewayUrl: "https://sandbox.payhere.lk/pay/checkout",
-            merchantId: process.env.PAYHERE_MERCHANT_ID || "MOCK_MERCHANT_ID",
-            orderId: order.id,
-            amount: order.totalAmount || 0
-        });
-
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+    if (!orderId || !method) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID and payment method are required.",
+      });
     }
+
+    const numericOrderId = Number(orderId);
+
+    if (!Number.isInteger(numericOrderId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID.",
+      });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: numericOrderId,
+        userId: req.user.id,
+      },
+      include: {
+        orderItems: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    /**
+     * Cash on Delivery
+     */
+    if (method.toLowerCase() === "cod") {
+      const updatedOrder = await prisma.order.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          orderStatus: "PLACED",
+          paymentStatus: "PENDING",
+        },
+      });
+
+      try {
+        await notificationService.create({
+          userId: req.user.id,
+          title: "Order Placed 📦",
+          message: `Your order #${order.orderNumber} has been placed successfully.`,
+          type: "ORDER",
+          link: `/orders/${order.orderNumber}`,
+        });
+
+        await notificationService.create({
+          userId: req.user.id,
+          title: "Cash on Delivery Selected 💵",
+          message: `Your order #${order.orderNumber} will be paid on delivery.`,
+          type: "PAYMENT",
+          link: `/orders/${order.orderNumber}`,
+        });
+
+        console.log(
+          "✅ COD order notifications created",
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ COD notification failed:",
+          notificationError,
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Order placed successfully via COD.",
+        order: updatedOrder,
+      });
+    }
+
+    /**
+     * Online Payment
+     *
+     * Current project uses a simulated gateway page.
+     */
+    return res.status(200).json({
+      success: true,
+      gatewayUrl: "https://sandbox.payhere.lk/pay/checkout",
+      merchantId:
+        process.env.PAYHERE_MERCHANT_ID ||
+        "MOCK_MERCHANT_ID",
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      amount: order.totalAmount || 0,
+      currency: "LKR",
+    });
+  } catch (error) {
+    console.error(
+      "Initiate Payment Error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to initiate payment.",
+    });
+  }
 };
 
-// 2. Handle Payment Webhook (Verification)
+/**
+ * 2. Handle Payment Webhook
+ *
+ * POST /api/v1/payments/webhook
+ *
+ * This endpoint supports the CURRENT simulated frontend payment flow.
+ *
+ * Success:
+ * status_code === 2
+ *
+ * Failed:
+ * anything other than 2
+ */
 export const handlePaymentWebhook = async (req, res) => {
-    const { gateway } = req.params;
-    const paymentData = req.body;
+  const {
+    gateway,
+    order_id,
+    status_code,
+    amount,
+    payment_method,
+  } = req.body;
 
-    try {
-        const isVerified = true; // Placeholder for actual hash validation
-
-        if (isVerified && paymentData.status_code === 2) { 
-            // COMMENTED OUT PRISMA TO TEST WITHOUT DB:
-            // await prisma.order.update({ ... });
-            
-            console.log(`[Test] Success! Mock updating order ID: ${paymentData.order_id} to CONFIRMED/PAID`);
-            console.log(`[Test] Gateway used: ${gateway}`);
-        } else {
-            console.log(`[Test] Condition not met. Status code received: ${paymentData.status_code}`);
-        }
-
-        res.status(200).send("Webhook Received");
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Webhook processing failed" });
+  try {
+    if (!order_id) {
+      return res.status(400).json({
+        success: false,
+        message: "order_id is required.",
+      });
     }
+
+    const paymentSuccessful =
+      Number(status_code) === 2;
+
+    /**
+     * The current frontend generates IDs such as:
+     *
+     * DCC-579266
+     *
+     * while the Prisma Order model uses an Int ID.
+     *
+     * Therefore we first try the numeric database ID.
+     * If the current order is still frontend-only, we
+     * fall back to the frontend order number.
+     */
+    let order = null;
+
+    const numericOrderId = Number(order_id);
+
+    if (Number.isInteger(numericOrderId)) {
+      order = await prisma.order.findUnique({
+        where: {
+          id: numericOrderId,
+        },
+      });
+    }
+
+    /**
+     * If order_id is something like DCC-579266,
+     * try orderNumber.
+     */
+    if (!order) {
+      order = await prisma.order.findUnique({
+        where: {
+          orderNumber: String(order_id),
+        },
+      });
+    }
+
+    /**
+     * --------------------------------------------------
+     * PAYMENT SUCCESS
+     * --------------------------------------------------
+     */
+    if (paymentSuccessful) {
+      console.log(
+        `✅ Payment successful for order ${order_id}`,
+      );
+
+      /**
+       * If the order already exists in Prisma,
+       * update the real order.
+       */
+      if (order) {
+        await prisma.order.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            paymentStatus: "PAID",
+            orderStatus: "CONFIRMED",
+          },
+        });
+
+        /**
+         * Create / update transaction record.
+         */
+        try {
+          const transactionReference =
+            `TXN-${Date.now()}-${order.id}`;
+
+          const existingTransaction =
+            await prisma.transaction.findUnique({
+              where: {
+                orderId: order.id,
+              },
+            });
+
+          if (existingTransaction) {
+            await prisma.transaction.update({
+              where: {
+                orderId: order.id,
+              },
+              data: {
+                status: "SUCCESS",
+                amount:
+                  Number(amount) ||
+                  order.totalAmount ||
+                  0,
+                paymentGateway:
+                  gateway || payment_method || "UNKNOWN",
+                paidAt: new Date(),
+                gatewayResponse: req.body,
+              },
+            });
+          } else {
+            await prisma.transaction.create({
+              data: {
+                orderId: order.id,
+                transactionReference,
+                paymentGateway:
+                  gateway || payment_method || "UNKNOWN",
+                amount:
+                  Number(amount) ||
+                  order.totalAmount ||
+                  0,
+                currency: "LKR",
+                status: "SUCCESS",
+                paidAt: new Date(),
+                gatewayResponse: req.body,
+              },
+            });
+          }
+        } catch (transactionError) {
+          console.error(
+            "⚠️ Transaction update failed:",
+            transactionError,
+          );
+        }
+      }
+
+      /**
+       * Create PAYMENT notification.
+       *
+       * Use req.user because the current frontend
+       * calls this endpoint while the buyer is logged in.
+       */
+      if (req.user?.id) {
+        await notificationService.create({
+          userId: req.user.id,
+          title: "Payment Successful 💳",
+          message: `Payment of LKR ${Number(
+            amount || 0,
+          ).toLocaleString()} for order #${order_id} was successful.`,
+          type: "PAYMENT",
+          link: `/order/${order_id}/success`,
+        });
+
+        /**
+         * Order confirmation notification.
+         */
+        await notificationService.create({
+          userId: req.user.id,
+          title: "Order Confirmed ✅",
+          message: `Your order #${order_id} has been confirmed.`,
+          type: "ORDER",
+          link: `/order/${order_id}/success`,
+        });
+
+        console.log(
+          "✅ Payment and order confirmation notifications created.",
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        paymentStatus: "PAID",
+        orderStatus: "CONFIRMED",
+        message: "Payment successful and notification created.",
+      });
+    }
+
+    /**
+     * --------------------------------------------------
+     * PAYMENT FAILED
+     * --------------------------------------------------
+     */
+
+    console.log(
+      `❌ Payment failed for order ${order_id}`,
+    );
+
+    if (order) {
+      await prisma.order.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          paymentStatus: "FAILED",
+        },
+      });
+
+      /**
+       * Update transaction if one exists.
+       */
+      try {
+        const existingTransaction =
+          await prisma.transaction.findUnique({
+            where: {
+              orderId: order.id,
+            },
+          });
+
+        if (existingTransaction) {
+          await prisma.transaction.update({
+            where: {
+              orderId: order.id,
+            },
+            data: {
+              status: "FAILED",
+              gatewayResponse: req.body,
+            },
+          });
+        }
+      } catch (transactionError) {
+        console.error(
+          "⚠️ Failed to update transaction:",
+          transactionError,
+        );
+      }
+    }
+
+    /**
+     * Create payment failure notification.
+     */
+    if (req.user?.id) {
+      await notificationService.create({
+        userId: req.user.id,
+        title: "Payment Failed ❌",
+        message: `Payment for order #${order_id} could not be completed. Please try again.`,
+        type: "PAYMENT",
+        link: `/order/${order_id}/failed`,
+      });
+
+      console.log(
+        "✅ Payment failure notification created.",
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      paymentStatus: "FAILED",
+      message: "Payment failure processed and notification created.",
+    });
+  } catch (error) {
+    console.error(
+      "Payment Webhook Error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Webhook processing failed.",
+    });
+  }
 };
 
-// 3. Initiate Refund
+/**
+ * 3. Initiate Refund
+ *
+ * POST /api/v1/payments/refund/:orderId
+ */
 export const initiateRefund = async (req, res) => {
-    try {
-        const { orderId } = req.params;
-        const { reason } = req.body;
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
 
-        console.log(`\n--- Processing Refund Request ---`);
-        console.log(`Order ID from URL: ${orderId}`);
-        console.log(`Reason from Body: ${reason || "None provided"}`);
+    const numericOrderId = Number(orderId);
 
-        // 1. MOCK DATABASE LOOKUP
-        // Instead of searching the DB, mock the order status based on a query parameter or custom rules.
-        // For testing, let's look for a special string or assume it's CANCELLED unless we specify otherwise.
-        const mockOrder = {
-            id: parseInt(orderId),
-            // Shortcut: If you pass orderId 999, treat it as NOT cancelled to test the validation error.
-            status: orderId === "999" ? "DELIVERED" : "CANCELLED" 
-        };
-
-        // 2. STATUS CHECK VALIDATION
-        if (mockOrder.status !== 'CANCELLED') {
-            console.log(`=> Validation Failed: Order status is ${mockOrder.status}`);
-            return res.status(400).json({ error: "Only cancelled orders can be refunded" });
-        }
-
-        // 3. MOCK GATEWAY & TRANSACTION UPDATE
-        // await prisma.transaction.update({ ... });
-        console.log(`=> Success! [MOCK] Gateway Refund API called.`);
-        console.log(`=> Success! [MOCK] Transaction for Order ${orderId} updated to 'REFUNDED'.`);
-
-        res.status(200).json({ message: "Refund processed successfully" });
-    } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ error: error.message });
+    if (!Number.isInteger(numericOrderId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID.",
+      });
     }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: numericOrderId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    if (
+      String(order.orderStatus).toUpperCase() !==
+      "CANCELLED"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only cancelled orders can be refunded.",
+      });
+    }
+
+    /**
+     * Current project refund is still a mock gateway
+     * operation.
+     */
+    console.log(
+      `Refund requested for order ${order.orderNumber}`,
+    );
+
+    console.log(
+      `Reason: ${reason || "None provided"}`,
+    );
+
+    await prisma.order.update({
+      where: {
+        id: order.id,
+      },
+      data: {
+        paymentStatus: "REFUNDED",
+        orderStatus: "REFUNDED",
+      },
+    });
+
+    /**
+     * Create refund notification.
+     */
+    try {
+      await notificationService.create({
+        userId: req.user.id,
+        title: "Refund Processed 💰",
+        message: `Your refund for order #${order.orderNumber} has been processed.`,
+        type: "PAYMENT",
+        link: `/orders/${order.orderNumber}`,
+      });
+
+      console.log(
+        "✅ Refund notification created.",
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ Refund notification failed:",
+        notificationError,
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Refund processed successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "Initiate Refund Error:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
