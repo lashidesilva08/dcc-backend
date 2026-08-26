@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import redisClient from '../config/redis.js';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/emailService.js';
+import emailService from "../services/email.service.js";
+import notificationService from "../services/notification.service.js";
 
 const prisma = new PrismaClient();
 
@@ -15,81 +16,215 @@ const generateToken = (userId, role) => {
   );
 };
 
+
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body
+
+    // ------------------------------------------
+    // Validate input
+    // ------------------------------------------
 
     if (!name || !email || !password) {
       return res.status(400).json({
-        message: 'Name, email and password are required.'
-      });
+        message: 'Name, email and password are required.',
+      })
     }
 
-    // Rate limiting — max 3 registrations per hour per IP
-    const rateLimitKey = `register_attempts:${req.ip}`;
-    const attempts = await redisClient.get(rateLimitKey);
+    const cleanName = name.trim()
+    const cleanEmail = email.toLowerCase().trim()
+
+    if (!cleanName) {
+      return res.status(400).json({
+        message: 'Name is required.',
+      })
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters.',
+      })
+    }
+
+    // ------------------------------------------
+    // Rate limiting
+    // ------------------------------------------
+
+    const rateLimitKey = `register_attempts:${req.ip}`
+    const attempts = await redisClient.get(rateLimitKey)
 
     if (attempts && parseInt(attempts) >= 3) {
       return res.status(429).json({
-        message: 'Too many registration attempts. Please try again after 1 hour.'
-      });
+        message:
+          'Too many registration attempts. Please try again after 1 hour.',
+      })
     }
 
-    await redisClient.incr(rateLimitKey);
-    await redisClient.expire(rateLimitKey, 60 * 60);
+    await redisClient.incr(rateLimitKey)
+    await redisClient.expire(rateLimitKey, 60 * 60)
+
+    // ------------------------------------------
+    // Check existing user
+    // ------------------------------------------
 
     const existing = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() }
-    });
+      where: {
+        email: cleanEmail,
+      },
+    })
 
     if (existing) {
       return res.status(400).json({
-        message: 'An account with this email already exists.'
-      });
+        message: 'An account with this email already exists.',
+      })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // ------------------------------------------
+    // Hash password
+    // ------------------------------------------
+
+    const hashedPassword = await bcrypt.hash(password, 12)
+
+    // ------------------------------------------
+    // Create USER
+    //
+    // IMPORTANT:
+    // Public registration is ALWAYS BUYER.
+    // Never trust role from frontend.
+    // ------------------------------------------
 
     const user = await prisma.user.create({
       data: {
-        name,
-        email: email.toLowerCase().trim(),
+        name: cleanName,
+        email: cleanEmail,
         password: hashedPassword,
-        role: role || 'BUYER',
-        verified: false
-      }
-    });
+        role: 'BUYER',
+        verified: false,
+      },
+    })
 
-    const verifyToken = crypto.randomBytes(32).toString('hex');
+    console.log(
+      `User account created successfully: ${user.id} - ${user.email}`
+    )
+
+    // ------------------------------------------
+    // Generate email verification token
+    // ------------------------------------------
+
+    const verifyToken = crypto.randomBytes(32).toString('hex')
 
     await redisClient.setEx(
       `verify:${verifyToken}`,
       24 * 60 * 60,
       user.id.toString()
-    );
+    )
 
-    await sendVerificationEmail(user.email, verifyToken);
+    const verifyLink =
+      `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`
 
-    const token = generateToken(user.id, user.role);
+    // ------------------------------------------
+    // Send verification email
+    //
+    // IMPORTANT:
+    // Email failure should NOT delete/fail the
+    // already-created database account.
+    // ------------------------------------------
 
-    res.status(201).json({
-      message: 'Account created successfully. Please check your email to verify your account.',
+    try {
+      await emailService.sendVerification(
+        user,
+        verifyLink
+      )
+    } catch (emailError) {
+      console.error(
+        'Verification email failed:',
+        emailError
+      )
+    }
+
+    // ------------------------------------------
+    // Send welcome email
+    // ------------------------------------------
+
+    try {
+      await emailService.sendWelcome(user)
+    } catch (emailError) {
+      console.error(
+        'Welcome email failed:',
+        emailError
+      )
+    }
+
+    // ------------------------------------------
+    // Create welcome notification
+    // ------------------------------------------
+
+    try {
+      await notificationService.welcome(user.id)
+    } catch (notificationError) {
+      console.error(
+        'Welcome notification failed:',
+        notificationError
+      )
+    }
+
+    // ------------------------------------------
+    // Generate JWT
+    // ------------------------------------------
+
+    const token = generateToken(
+      user.id,
+      user.role
+    )
+
+    // ------------------------------------------
+    // Return successful registration response
+    // ------------------------------------------
+
+    return res.status(201).json({
+      success: true,
+
+      message:
+        'Account created successfully. Please check your email to verify your account.',
+
       token,
+
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
-    });
-
+        role: user.role,
+        verified: user.verified,
+      },
+    })
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({
-      message: 'Something went wrong. Please try again.'
-    });
+    console.error(
+      'Register error:',
+      error
+    )
+
+    // ------------------------------------------
+    // Handle duplicate email race condition
+    // ------------------------------------------
+
+    if (error?.code === 'P2002') {
+      return res.status(400).json({
+        message:
+          'An account with this email already exists.',
+      })
+    }
+
+    return res.status(500).json({
+      message:
+        'Something went wrong while creating your account.',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : undefined,
+    })
   }
-};
+}
+
 
 export const login = async (req, res) => {
   try {
@@ -159,7 +294,25 @@ export const forgotPassword = async (req, res) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     await redisClient.setEx(`reset:${resetToken}`, 3600, user.id.toString());
-    await sendPasswordResetEmail(user.email, resetToken);
+    const resetLink =
+`${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+await emailService.sendPasswordReset(
+    user,
+    resetLink
+);
+
+await notificationService.create({
+
+    userId:user.id,
+
+    title:"Password Reset",
+
+    message:"Password reset link has been sent to your email.",
+
+    type:"ACCOUNT"
+
+});
 
     res.status(200).json({ message: successMessage });
   } catch (error) {
@@ -294,6 +447,19 @@ export const verifyEmail = async (req, res) => {
     }
 
     await prisma.user.update({ where: { id: parseInt(userId) }, data: { verified: true } });
+
+    await notificationService.create({
+
+    userId:Number(userId),
+
+    title:"Email Verified",
+
+    message:"Your email has been successfully verified.",
+
+    type:"ACCOUNT"
+
+});
+
     await redisClient.del(`verify:${token}`);
 
     res.status(200).json({ message: 'Email verified successfully. You can now log in.' });

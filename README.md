@@ -141,8 +141,30 @@ Create a `.env` file:
 
 ```env
 PORT=5000
-DATABASE_URL="postgresql://username:password@localhost:5432/digital_city_center"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/digital_city_center"
+NODE_ENV="development"
+REDIS_URL="redis://localhost:6379"
 JWT_SECRET=your_secret_key
+GOOGLE_CLIENT_ID=862870385262-3ci4ovdfhj81hbemgc5i69kqlfjt8ldq.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/v1/auth/google/callback
+SMTP_HOST=smtp.gmail.com
+
+SMTP_PORT=587
+
+SMTP_USER=tharzmt@gmail.com
+
+SMTP_PASS=akdsqxgjznbsehrm
+
+MAIL_FROM=Digital City Center <tharzmt@gmail.com>
+
+FRONTEND_URL=http://localhost:5173
+
+# PayHere Payment Gateway (Sandbox)
+PAYHERE_MERCHANT_ID=1236278
+PAYHERE_MERCHANT_SECRET=Mjg3NzMwMzk1ODM2NzQ2MzUzODAzNTA1OTc1NjQzMzQ2NzQ5NTY0NQ==
+PAYHERE_SANDBOX=true
+
 ```
 
 ---
@@ -172,7 +194,7 @@ npx prisma studio
 ### 5. Run Development Server
 
 ```bash
-npm run dev
+npm start
 ```
 
 Server runs at:
