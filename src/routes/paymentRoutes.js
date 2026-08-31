@@ -3,6 +3,7 @@ import {
     initiatePayment,
     handlePaymentWebhook,
     handleMintWebhook,
+    handleSimulatedPaymentWebhook,
     getPaymentStatus,
     initiateRefund,
 } from "../controllers/paymentControllers.js";
@@ -13,6 +14,11 @@ const router = express.Router();
 // POST /api/v1/payments/initiate
 // Auth required — buyer initiates payment (COD or PayHere)
 router.post("/initiate", protect, initiatePayment);
+
+// POST /api/v1/payments/webhook
+// Used by the simulated frontend payment gateway.
+// NO AUTH — webhook/payment notification endpoint.
+router.post("/webhook", handleSimulatedPaymentWebhook);
 
 // POST /api/v1/payments/webhook/payhere
 // NO AUTH — PayHere servers call this directly with the payment notification

@@ -173,6 +173,169 @@ export const initiatePayment = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
+// SIMULATED PAYMENT WEBHOOK
+// POST /api/v1/payments/webhook
+// Auth: NONE
+//
+// Used by the frontend's simulated payment gateway.
+// This is NOT the real PayHere webhook.
+// ─────────────────────────────────────────────
+export const handleSimulatedPaymentWebhook = async (req, res) => {
+    try {
+        const paymentData = req.body;
+
+        console.log("[Simulated Payment Webhook] Received:", paymentData);
+
+        const orderId = Number(paymentData.order_id);
+        const statusCode = Number(paymentData.status_code);
+        const amount = Number(paymentData.amount || 0);
+
+        if (!orderId || !Number.isInteger(orderId)) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid order_id is required.",
+            });
+        }
+
+        if (![2, 0].includes(statusCode)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid payment status.",
+            });
+        }
+
+        // Find the order first
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                user: true,
+            },
+        });
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found.",
+            });
+        }
+
+        // ─────────────────────────────────────
+        // PAYMENT SUCCESS
+        // ─────────────────────────────────────
+        if (statusCode === 2) {
+            const [updatedOrder] = await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "paid",
+                        orderStatus: "confirmed",
+                    },
+                    include: {
+                        user: true,
+                    },
+                }),
+
+                prisma.transaction.upsert({
+                    where: { orderId },
+
+                    create: {
+                        orderId,
+                        transactionReference: `SIM-${orderId}-${Date.now()}`,
+                        paymentGateway:
+                            String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                        amount: amount || Number(order.totalAmount),
+                        currency: "LKR",
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+
+                    update: {
+                        paymentGateway:
+                            String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                        amount: amount || Number(order.totalAmount),
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                }),
+            ]);
+
+            // Send confirmation email
+            emailService
+                .sendOrderConfirmation(updatedOrder.user, {
+                    id: updatedOrder.orderNumber,
+                    total: updatedOrder.totalAmount,
+                })
+                .catch((err) =>
+                    console.error(
+                        "Error sending simulated payment confirmation email:",
+                        err
+                    )
+                );
+
+            console.log(
+                `[Simulated Payment Webhook] ✅ Order #${orderId} marked as PAID.`
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "Simulated payment processed successfully.",
+                orderId: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                paymentStatus: updatedOrder.paymentStatus,
+                orderStatus: updatedOrder.orderStatus,
+            });
+        }
+
+        // ─────────────────────────────────────
+        // PAYMENT PENDING
+        // ─────────────────────────────────────
+        await prisma.transaction.upsert({
+            where: { orderId },
+
+            create: {
+                orderId,
+                transactionReference: `SIM-PENDING-${orderId}`,
+                paymentGateway:
+                    String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                amount: amount || Number(order.totalAmount),
+                currency: "LKR",
+                status: "pending",
+                gatewayResponse: paymentData,
+            },
+
+            update: {
+                status: "pending",
+                gatewayResponse: paymentData,
+            },
+        });
+
+        console.log(
+            `[Simulated Payment Webhook] ⏳ Order #${orderId} payment is pending.`
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Simulated payment is pending.",
+            orderId,
+        });
+
+    } catch (error) {
+        console.error(
+            "[Simulated Payment Webhook] Error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to process simulated payment.",
+            error: error.message,
+        });
+    }
+};
+
+// ─────────────────────────────────────────────
 // 2. PAYHERE WEBHOOK (Server Notification)
 //    POST /api/v1/payments/webhook/payhere
 //    Auth: NONE — PayHere calls this directly
