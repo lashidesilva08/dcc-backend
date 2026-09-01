@@ -349,50 +349,157 @@ export const resetPassword = async (req, res) => {
 
 export const registerSeller = async (req, res) => {
   try {
-    const { name, email, password, shop_name, business_type, phone } = req.body;
+    const {
+      name,
+      email,
+      password,
+      shop_name,
+      business_type,
+      phone,
+    } = req.body
 
-    if (!name || !email || !password || !shop_name || !business_type) {
-      return res.status(400).json({ message: 'All fields are required.' });
+    // Validation
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !shop_name ||
+      !business_type
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Name, email, password, shop name and business type are required.',
+      })
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-    if (existing) {
-      return res.status(400).json({ message: 'An account with this email already exists.' });
+    const cleanName = name.trim()
+    const cleanEmail = email.toLowerCase().trim()
+    const cleanShopName = shop_name.trim()
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Password must be at least 8 characters.',
+      })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Check email
+    const existingUser =
+      await prisma.user.findUnique({
+        where: {
+          email: cleanEmail,
+        },
+      })
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email: email.toLowerCase().trim(),
-        password: hashedPassword,
-        role: 'SELLER',
-        phone: phone || null,
-        verified: false
-      }
-    });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'An account with this email already exists.',
+      })
+    }
 
-    await prisma.seller.create({
-      data: {
-        userId: user.id,
-        shopName: shop_name,
-        shopUrl: shop_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        businessType: business_type,
-        status: 'pending'
-      }
-    });
+    const hashedPassword =
+      await bcrypt.hash(password, 12)
 
-    res.status(201).json({
-      message: 'Seller account submitted. You will receive an email once approved by admin.',
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
-    });
+    // Create safe unique shop URL
+    const baseShopUrl = cleanShopName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
 
+    let shopUrl = baseShopUrl || 'shop'
+
+    const existingShop =
+      await prisma.seller.findUnique({
+        where: {
+          shopUrl,
+        },
+      })
+
+    if (existingShop) {
+      shopUrl = `${shopUrl}-${Date.now()}`
+    }
+
+    // Create User + Seller together
+    const result =
+      await prisma.$transaction(async (tx) => {
+        const user =
+          await tx.user.create({
+            data: {
+              name: cleanName,
+              email: cleanEmail,
+              password: hashedPassword,
+              phone:
+                phone?.trim() || null,
+              role: 'SELLER',
+              verified: false,
+            },
+          })
+
+        const seller =
+          await tx.seller.create({
+            data: {
+              userId: user.id,
+              shopName: cleanShopName,
+              shopUrl,
+              businessType: business_type,
+              status: 'pending',
+              memberSince: new Date(),
+            },
+          })
+
+        return {
+          user,
+          seller,
+        }
+      })
+
+    return res.status(201).json({
+      success: true,
+
+      message:
+        'Seller account created successfully. You can now log in.',
+
+      user: {
+        id: result.user.id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role,
+      },
+
+      seller: {
+        id: result.seller.id,
+        shopName:
+          result.seller.shopName,
+        status:
+          result.seller.status,
+      },
+    })
   } catch (error) {
-    console.error('Seller register error:', error);
-    res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    console.error(
+      'Seller registration error:',
+      error
+    )
+
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        success: false,
+        message:
+          'This email or shop URL is already in use.',
+      })
+    }
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Something went wrong while creating your seller account.',
+    })
   }
-};
+}
 
 export const adminLogin = async (req, res) => {
   try {
