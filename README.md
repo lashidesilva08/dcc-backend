@@ -194,7 +194,7 @@ npx prisma studio
 ### 5. Run Development Server
 
 ```bash
-npm run dev
+npm start
 ```
 
 Server runs at:

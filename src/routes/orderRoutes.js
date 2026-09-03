@@ -1,48 +1,28 @@
 import express from "express";
-
 import {
-  createOrder,
-  getMyOrders,
-  updateOrderStatus,
-  getSellerOrders,
-  getInvoice,
-  checkout,
-  getOrderById,
-  cancelOrder,
-  trackOrder,
+    createOrder,
+    getInvoice,
+    getMyOrders,
+    getSellerOrders,
+    updateOrderStatus,
+    getOrderById,
+    cancelOrder,
+    trackOrder,
 } from "../controllers/orderControllers.js";
-
-import { protect } from "../middleware/auth.middleware.js";
+import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// All order routes require authentication
 router.use(protect);
 
-// Checkout
-router.post("/checkout", checkout);
-
-// Create order
-router.post("/", createOrder);
-
-// Get logged-in user's orders
-router.get("/my-orders", getMyOrders);
-
-// Seller orders
-router.get("/seller", getSellerOrders);
-
-// Get order by ID
-router.get("/:id", getOrderById);
-
-// Get invoice
-router.get("/:id/invoice", getInvoice);
-
-// Update order status
-router.patch("/:id/status", updateOrderStatus);
-
-// Cancel order
-router.patch("/:id/cancel", cancelOrder);
-
-// Track order
-router.get("/:id/track", trackOrder);
+router.post("/checkout", createOrder);           // Buyer: create order from cart
+router.get("/my-orders", getMyOrders);           // Buyer: order history
+router.get("/seller-orders", getSellerOrders);   // Seller: view their orders
+router.get("/track/:id", trackOrder);            // Buyer: track an order
+router.get("/:id/invoice", getInvoice);          // Buyer/Admin: get invoice
+router.get("/:id", getOrderById);               // Buyer/Admin: order details
+router.patch("/:id/status", updateOrderStatus);  // Seller/Admin: update status
+router.delete("/:id", cancelOrder);             // Buyer: cancel order
 
 export default router;

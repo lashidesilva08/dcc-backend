@@ -14,16 +14,10 @@ const protect = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    // Check if token is blacklisted in Redis (if Redis is running)
-    if (redisClient.isOpen) {
-      try {
-        const isBlacklisted = await redisClient.get(`blacklist:${token}`);
-        if (isBlacklisted) {
-          return res.status(401).json({ message: 'Session expired. Please log in again.' });
-        }
-      } catch (err) {
-        // Ignore redis errors if client is disconnected
-      }
+    // Check if token is blacklisted in Redis
+    const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+    if (isBlacklisted) {
+      return res.status(401).json({ message: 'Session expired. Please log in again.' });
     }
 
     let decoded;
