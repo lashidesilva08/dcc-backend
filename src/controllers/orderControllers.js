@@ -352,43 +352,217 @@ export const cancelOrder = async (req, res) => {
 //    PATCH /api/v1/orders/:id/status
 //    Auth: Required (seller or admin)
 // ─────────────────────────────────────────────
-export const updateOrderStatus = async (req, res) => {
+
+export const updateOrderStatus =
+  async (req, res) => {
     try {
-        const { id } = req.params;
-        const { status } = req.body;
+      const orderId =
+        Number(req.params.id)
 
-        const validStatuses = ["placed", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+      const { status } =
+        req.body
 
-        if (!status || !validStatuses.includes(status)) {
-            return res.status(400).json({
-                success: false,
-                message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-            });
-        }
+      const validStatuses = [
+        'placed',
+        'confirmed',
+        'processing',
+        'ready_for_pickup',
+        'dispatched',
+        'shipped',
+        'delivered',
+        'cancelled',
+      ]
 
-        const order = await prisma.order.findUnique({ where: { id: Number(id) } });
+      if (
+        !Number.isInteger(orderId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Invalid order ID.',
+        })
+      }
+
+      if (
+        !status ||
+        !validStatuses.includes(
+          status
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid status. Allowed statuses: ${validStatuses.join(', ')}`,
+        })
+      }
+
+      /*
+       * ADMIN
+       *
+       * Admin can manage the full order.
+       */
+      if (
+        String(
+          req.user.role
+        ).toUpperCase() ===
+        'ADMIN'
+      ) {
+        const order =
+          await prisma.order.findUnique(
+            {
+              where: {
+                id: orderId,
+              },
+            }
+          )
 
         if (!order) {
-            return res.status(404).json({ success: false, message: "Order not found." });
+          return res.status(404).json({
+            success: false,
+            message:
+              'Order not found.',
+          })
         }
 
-        const updated = await prisma.order.update({
-            where: { id: Number(id) },
-            data: { orderStatus: status },
-        });
+        const updated =
+          await prisma.order.update(
+            {
+              where: {
+                id: orderId,
+              },
+
+              data: {
+                orderStatus:
+                  status,
+              },
+            }
+          )
 
         return res.status(200).json({
-            success: true,
-            message: `Order status updated to "${status}".`,
-            orderId: updated.id,
-            orderStatus: updated.orderStatus,
-        });
+          success: true,
+          message:
+            `Order status updated to "${status}".`,
+          orderId:
+            updated.id,
+          orderStatus:
+            updated.orderStatus,
+        })
+      }
 
+      /*
+       * SELLER
+       */
+      if (
+        String(
+          req.user.role
+        ).toUpperCase() !==
+        'SELLER'
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Only sellers or admins can update order status.',
+        })
+      }
+
+      const seller =
+        await prisma.seller.findUnique(
+          {
+            where: {
+              userId:
+                req.user.id,
+            },
+          }
+        )
+
+      if (!seller) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'Seller account not found.',
+        })
+      }
+
+      /*
+       * Check whether this seller owns
+       * at least one OrderItem in this order.
+       */
+      const sellerItems =
+        await prisma.orderItem.findMany(
+          {
+            where: {
+              orderId,
+              sellerId:
+                seller.id,
+            },
+
+            select: {
+              id: true,
+              itemStatus: true,
+            },
+          }
+        )
+
+      if (
+        sellerItems.length === 0
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            'You cannot manage this order because it does not contain your products.',
+        })
+      }
+
+      /*
+       * IMPORTANT:
+       *
+       * Update seller's OrderItems,
+       * NOT the complete Order.
+       *
+       * This protects multi-seller orders.
+       */
+      await prisma.orderItem.updateMany(
+        {
+          where: {
+            orderId,
+            sellerId:
+              seller.id,
+          },
+
+          data: {
+            itemStatus:
+              status,
+          },
+        }
+      )
+
+      return res.status(200).json({
+        success: true,
+
+        message:
+          `Your order items have been updated to "${status}".`,
+
+        orderId,
+
+        sellerId:
+          seller.id,
+
+        itemStatus:
+          status,
+      })
     } catch (error) {
-        console.error("updateOrderStatus error:", error);
-        return res.status(500).json({ success: false, message: "Failed to update order status." });
+      console.error(
+        'updateOrderStatus error:',
+        error
+      )
+
+      return res.status(500).json({
+        success: false,
+        message:
+          'Failed to update order status.',
+      })
     }
-};
+  }
 
 // ─────────────────────────────────────────────
 // 6. GET SELLER ORDERS
