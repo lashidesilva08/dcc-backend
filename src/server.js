@@ -11,6 +11,7 @@ import {
   connectRedis,
   disconnectRedis,
 } from './config/redis.js'
+import { initPayoutCron } from './cron/payoutCron.js';
 
 const startServer = async () => {
   try {
@@ -26,6 +27,8 @@ const startServer = async () => {
         console.log(
           `Server running on http://localhost:${PORT}`
         )
+        // Initialize cron job after server starts
+        // initPayoutCron();
       }
     )
 
