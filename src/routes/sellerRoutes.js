@@ -1,45 +1,29 @@
+
 import express from 'express'
 
 import {
-  getMySellerProfile,
+  getSellerMe,
   getSellerDashboard,
 } from '../controllers/sellerControllers.js'
 
-import { protect } from '../middleware/auth.js'
-
 import {
-  requireSeller,
-  requireApprovedSeller,
-} from '../middleware/sellerMiddleware.js'
+  protect,
+  requireRole,
+} from '../middleware/auth.middleware.js'
 
 const router = express.Router()
 
-/*
- * All seller routes require JWT.
- */
+// Authentication required for all seller routes
 router.use(protect)
 
-/*
- * Seller account information.
- *
- * Pending sellers can access this endpoint
- * so frontend can show their approval status.
- */
-router.get(
-  '/me',
-  requireSeller,
-  getMySellerProfile
-)
+// Only SELLER accounts can access these routes
+router.use(requireRole('SELLER'))
 
-/*
- * Seller dashboard.
- *
- * ONLY APPROVED SELLERS can access.
- */
-router.get(
-  '/dashboard',
-  requireApprovedSeller,
-  getSellerDashboard
-)
+// Logged-in seller information / approval status
+router.get('/me', getSellerMe)
+
+// Seller dashboard
+router.get('/dashboard', getSellerDashboard)
 
 export default router
+
