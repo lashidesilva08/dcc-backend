@@ -1,9 +1,9 @@
-
 import express from 'express'
 
 import {
   getSellerMe,
   getSellerDashboard,
+  getSellerProfileStatus,
 } from '../controllers/sellerControllers.js'
 
 import {
@@ -13,17 +13,34 @@ import {
 
 const router = express.Router()
 
-// Authentication required for all seller routes
+// ---------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------
+
 router.use(protect)
 
-// Only SELLER accounts can access these routes
+// ---------------------------------------------------------
+// Seller role
+// ---------------------------------------------------------
+
 router.use(requireRole('SELLER'))
 
-// Logged-in seller information / approval status
+// ---------------------------------------------------------
+// Seller approval status
+// ---------------------------------------------------------
+
+router.get('/status', getSellerProfileStatus)
+
+// ---------------------------------------------------------
+// Logged-in seller
+// ---------------------------------------------------------
+
 router.get('/me', getSellerMe)
 
+// ---------------------------------------------------------
 // Seller dashboard
+// ---------------------------------------------------------
+
 router.get('/dashboard', getSellerDashboard)
 
 export default router
-

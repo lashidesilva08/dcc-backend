@@ -1,5 +1,56 @@
 import prisma from '../config/prisma.js'
 
+//import { PrismaClient } from '@prisma/client'
+
+//const prisma = new PrismaClient()
+
+export const getSellerProfileStatus = async (req, res) => {
+  try {
+    const seller = await prisma.seller.findUnique({
+      where: {
+        userId: req.user.id,
+      },
+      select: {
+        id: true,
+        userId: true,
+        shopName: true,
+        shopUrl: true,
+        businessType: true,
+        status: true,
+        image: true,
+        bannerImage: true,
+        location: true,
+        rating: true,
+        reviewCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller profile not found.',
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      seller: {
+        ...seller,
+        status: String(seller.status || '').toLowerCase(),
+      },
+    })
+  } catch (error) {
+    console.error('Get seller profile status error:', error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load seller status.',
+    })
+  }
+}
+
 /**
  * GET /api/v1/seller/me
  *
@@ -8,13 +59,6 @@ import prisma from '../config/prisma.js'
  */
 export const getSellerMe = async (req, res) => {
   try {
-    if (!req.user?.id) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required',
-      })
-    }
-
     const seller = await prisma.seller.findUnique({
       where: {
         userId: req.user.id,
@@ -26,8 +70,6 @@ export const getSellerMe = async (req, res) => {
             name: true,
             email: true,
             phone: true,
-            role: true,
-            verified: true,
           },
         },
       },
@@ -36,7 +78,7 @@ export const getSellerMe = async (req, res) => {
     if (!seller) {
       return res.status(404).json({
         success: false,
-        message: 'Seller profile not found',
+        message: 'Seller profile not found.',
       })
     }
 
@@ -48,34 +90,22 @@ export const getSellerMe = async (req, res) => {
         shopName: seller.shopName,
         shopUrl: seller.shopUrl,
         businessType: seller.businessType,
+        status: seller.status,
         image: seller.image,
         bannerImage: seller.bannerImage,
-
-        // IMPORTANT
-        status: seller.status,
-
-        commissionRate: seller.commissionRate,
-        rating: seller.rating,
-        reviewCount: seller.reviewCount,
-        views: seller.views,
-        featured: seller.featured,
         location: seller.location,
-        memberSince: seller.memberSince,
-        productCount: seller.productCount,
-
-        user: seller.user,
+        rating: Number(seller.rating || 0),
+        reviewCount: seller.reviewCount || 0,
+        commissionRate: Number(seller.commissionRate || 0),
+        owner: seller.user,
       },
     })
   } catch (error) {
-    console.error('getSellerMe error:', error)
+    console.error('Get seller profile error:', error)
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to load seller information',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : undefined,
+      message: 'Failed to load seller profile.',
     })
   }
 }
