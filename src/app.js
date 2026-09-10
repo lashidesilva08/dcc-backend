@@ -9,7 +9,9 @@ import orderRoutes from "./routes/orderRoutes.js";
 import cartRoutes from "./routes/cartRoutes.js"
 import emailRoutes from "./routes/email.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
-import sellerRoutes from './routes/sellerRoutes.js'
+import sellerRoutes from './routes/sellerRoutes.js';
+import sellerNotificationRoutes from './routes/sellerNotificationRoutes.js'
+import sellerDashboardRoutes from './routes/sellerDashboardRoutes.js';
 
 import wishlistRoutes from "./routes/wishlistRoutes.js"
 import paymentRoutes from "./routes/paymentRoutes.js"
@@ -61,7 +63,10 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/shops", shopRoutes);
 app.use("/api/v1/services", serviceRoutes);
 app.use("/api/v1/search", searchRoutes);
-app.use("/api/v1/sellers", sellerRoutes);
+app.use("/api/v1/seller", sellerRoutes);
+app.use('/api/v1/seller/notifications',sellerNotificationRoutes
+)
+//app.use("/api/v1/seller-dashboard", sellerDashboardRoutes);
 app.use("/api/v1/home", HomeRoute);
 
 

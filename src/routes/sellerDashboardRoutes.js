@@ -1,15 +1,17 @@
 import express from 'express'
 
 import {
-  getSellerMe,
-  getSellerDashboard,
-  getSellerProfileStatus,
-} from '../controllers/sellerControllers.js'
-
-import {
   protect,
   requireRole,
 } from '../middleware/auth.middleware.js'
+
+import {
+  getSellerDashboard,
+} from '../controllers/sellerDashboardController.js'
+
+import {
+  getSellerMe,
+} from '../controllers/sellerControllers.js'
 
 const router = express.Router()
 
@@ -26,13 +28,7 @@ router.use(protect)
 router.use(requireRole('SELLER'))
 
 // ---------------------------------------------------------
-// Seller approval status
-// ---------------------------------------------------------
-
-router.get('/status', getSellerProfileStatus)
-
-// ---------------------------------------------------------
-// Logged-in seller
+// Seller profile
 // ---------------------------------------------------------
 
 router.get('/me', getSellerMe)
