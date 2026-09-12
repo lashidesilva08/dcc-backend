@@ -4,6 +4,127 @@ import prisma from '../config/prisma.js'
 
 //const prisma = new PrismaClient()
 
+/**
+ * GET /api/v1/seller/bank-details
+ *
+ * Returns the logged-in seller's payout bank details.
+ */
+export const getSellerBankDetails = async (req, res) => {
+  try {
+    const seller = await prisma.seller.findUnique({
+      where: { userId: req.user.id },
+      select: {
+        id: true,
+        bankName: true,
+        bankAccountName: true,
+        bankAccountNumber: true,
+        bankBranch: true,
+      },
+    })
+
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller profile not found.',
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      bankDetails: {
+        bankName: seller.bankName || '',
+        bankAccountName: seller.bankAccountName || '',
+        bankAccountNumber: seller.bankAccountNumber || '',
+        bankBranch: seller.bankBranch || '',
+      },
+    })
+  } catch (error) {
+    console.error('Get seller bank details error:', error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load bank details.',
+    })
+  }
+}
+
+/**
+ * PUT /api/v1/seller/bank-details
+ *
+ * Creates or updates the logged-in seller's payout bank details.
+ * Body: { bankName, bankAccountName, bankAccountNumber, bankBranch }
+ */
+export const updateSellerBankDetails = async (req, res) => {
+  try {
+    const { bankName, bankAccountName, bankAccountNumber, bankBranch } = req.body
+
+    const errors = []
+
+    if (!bankName || !String(bankName).trim()) {
+      errors.push('Bank name is required.')
+    }
+
+    if (!bankAccountName || !String(bankAccountName).trim()) {
+      errors.push('Account holder name is required.')
+    }
+
+    if (!bankAccountNumber || !String(bankAccountNumber).trim()) {
+      errors.push('Account number is required.')
+    } else if (!/^[0-9A-Za-z-]{4,34}$/.test(String(bankAccountNumber).trim())) {
+      errors.push('Account number format looks invalid.')
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: errors.join(' '),
+        errors,
+      })
+    }
+
+    const seller = await prisma.seller.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true },
+    })
+
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Seller profile not found.',
+      })
+    }
+
+    const updated = await prisma.seller.update({
+      where: { id: seller.id },
+      data: {
+        bankName: String(bankName).trim(),
+        bankAccountName: String(bankAccountName).trim(),
+        bankAccountNumber: String(bankAccountNumber).trim(),
+        bankBranch: bankBranch ? String(bankBranch).trim() : null,
+      },
+      select: {
+        bankName: true,
+        bankAccountName: true,
+        bankAccountNumber: true,
+        bankBranch: true,
+      },
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bank details updated successfully.',
+      bankDetails: updated,
+    })
+  } catch (error) {
+    console.error('Update seller bank details error:', error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update bank details.',
+    })
+  }
+}
+
 export const getSellerProfileStatus = async (req, res) => {
   try {
     const seller = await prisma.seller.findUnique({

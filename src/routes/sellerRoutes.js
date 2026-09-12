@@ -4,6 +4,8 @@ import {
   getSellerMe,
   getSellerDashboard,
   getSellerProfileStatus,
+  getSellerBankDetails,
+  updateSellerBankDetails,
 } from '../controllers/sellerControllers.js'
 
 import {
@@ -42,5 +44,12 @@ router.get('/me', getSellerMe)
 // ---------------------------------------------------------
 
 router.get('/dashboard', getSellerDashboard)
+
+// ---------------------------------------------------------
+// Seller payout bank details
+// ---------------------------------------------------------
+
+router.get('/bank-details', getSellerBankDetails)
+router.put('/bank-details', updateSellerBankDetails)
 
 export default router

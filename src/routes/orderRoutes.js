@@ -4,6 +4,7 @@ import {
     getInvoice,
     getMyOrders,
     getSellerOrders,
+    getSellerOrderById,
     updateOrderStatus,
     getOrderById,
     cancelOrder,
@@ -18,7 +19,8 @@ router.use(protect);
 
 router.post("/checkout", createOrder);           // Buyer: create order from cart
 router.get("/my-orders", getMyOrders);           // Buyer: order history
-router.get("/seller-orders", getSellerOrders);   // Seller: view their orders
+router.get("/seller-orders", getSellerOrders);   // Seller: view their orders (status filter, search, pagination)
+router.get("/seller-orders/:id", getSellerOrderById); // Seller: single order details (own items only)
 router.get("/track/:id", trackOrder);            // Buyer: track an order
 router.get("/:id/invoice", getInvoice);          // Buyer/Admin: get invoice
 router.get("/:id", getOrderById);               // Buyer/Admin: order details
