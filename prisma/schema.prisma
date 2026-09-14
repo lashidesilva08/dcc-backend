@@ -71,8 +71,10 @@ model Seller {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   productCount   Int             @default(0)
-  bankName       String?
-  accountNumber  String?
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankBranch        String?
   listings       Listing[]
   orderItems     OrderItem[]
   user           User            @relation(fields: [userId], references: [id])
