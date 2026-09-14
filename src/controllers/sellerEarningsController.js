@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -16,7 +16,7 @@ export const getSellerEarnings = async (req, res) => {
     });
 
     if (!seller) {
-      return res.status(404).json({ error: 'Seller profile not found.' });
+      return res.status(404).json({ error: "Seller profile not found." });
     }
 
     const platformCommissionRate = seller.commissionRate / 100; // e.g., 10.0 -> 0.10
@@ -25,17 +25,16 @@ export const getSellerEarnings = async (req, res) => {
     const orderItems = await prisma.orderItem.findMany({
       where: {
         sellerId: seller.id,
-        itemStatus: 'delivered',
-      },
-      include: {
+        itemStatus: "delivered",
         order: {
-          select: {
-            createdAt: true,
-            paymentStatus: true,
-          },
+          paymentStatus: "paid", // Filters orderItems to only those with paid orders
         },
       },
+      include: {
+        order: true,
+      },
     });
+    console.log("Debug Order Items:", orderItems);
 
     // 3. Calculate Earnings
     const grossSales = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -45,23 +44,28 @@ export const getSellerEarnings = async (req, res) => {
     // 4. Fetch Payout history
     const payouts = await prisma.payout.findMany({
       where: { sellerId: seller.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     const totalPaidOut = payouts
-      .filter((p) => p.status === 'cleared')
+      .filter((p) => p.status === "cleared")
       .reduce((sum, p) => sum + p.amount, 0);
 
     const pendingPayouts = payouts
-      .filter((p) => p.status === 'pending')
+      .filter((p) => p.status === "pending")
       .reduce((sum, p) => sum + p.amount, 0);
 
-    const availableBalance = Math.max(0, netEarnings - totalPaidOut - pendingPayouts);
+    const availableBalance = Math.max(
+      0,
+      netEarnings - totalPaidOut - pendingPayouts,
+    );
 
     // 5. Aggregate sales by month
     const monthlyMap = {};
     orderItems.forEach((item) => {
-      const month = item.order.createdAt.toLocaleString('en-US', { month: 'short' });
+      const month = item.order.createdAt.toLocaleString("en-US", {
+        month: "short",
+      });
       const itemNet = item.subtotal * (1 - platformCommissionRate);
       monthlyMap[month] = (monthlyMap[month] || 0) + itemNet;
     });
@@ -90,7 +94,7 @@ export const getSellerEarnings = async (req, res) => {
       })),
     });
   } catch (error) {
-    console.error('[Seller Earnings Error]:', error);
+    console.error("[Seller Earnings Error]:", error);
     return res.status(500).json({ error: error.message });
   }
 };
@@ -108,33 +112,44 @@ export const requestPayout = async (req, res) => {
     });
 
     if (!seller) {
-      return res.status(404).json({ error: 'Seller profile not found.' });
+      return res.status(404).json({ error: "Seller profile not found." });
     }
 
     const platformCommissionRate = seller.commissionRate / 100;
 
     // Calculate available balance server-side
     const orderItems = await prisma.orderItem.findMany({
-      where: { sellerId: seller.id, itemStatus: 'delivered' },
+      where: { sellerId: seller.id, itemStatus: "delivered" },
     });
 
     const grossSales = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
     const netEarnings = grossSales * (1 - platformCommissionRate);
 
-    const payouts = await prisma.payout.findMany({ where: { sellerId: seller.id } });
-    const totalPaidOut = payouts.filter((p) => p.status === 'cleared').reduce((sum, p) => sum + p.amount, 0);
-    const pendingPayouts = payouts.filter((p) => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
+    const payouts = await prisma.payout.findMany({
+      where: { sellerId: seller.id },
+    });
+    const totalPaidOut = payouts
+      .filter((p) => p.status === "cleared")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const pendingPayouts = payouts
+      .filter((p) => p.status === "pending")
+      .reduce((sum, p) => sum + p.amount, 0);
 
-    const availableBalance = Math.max(0, netEarnings - totalPaidOut - pendingPayouts);
+    const availableBalance = Math.max(
+      0,
+      netEarnings - totalPaidOut - pendingPayouts,
+    );
 
     if (availableBalance <= 0) {
-      return res.status(400).json({ error: 'No available balance to withdraw.' });
+      return res
+        .status(400)
+        .json({ error: "No available balance to withdraw." });
     }
 
     const bankAccountInfo =
       seller.bankName && seller.accountNumber
         ? `${seller.bankName} - *${seller.accountNumber.slice(-4)}`
-        : 'HNB Bank - *4829';
+        : "HNB Bank - *4829";
 
     const payoutNumber = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -144,12 +159,12 @@ export const requestPayout = async (req, res) => {
         sellerId: seller.id,
         amount: availableBalance,
         bankAccountInfo,
-        status: 'pending',
+        status: "pending",
       },
     });
 
     return res.status(201).json({
-      message: 'Payout request submitted successfully.',
+      message: "Payout request submitted successfully.",
       payout: {
         id: newPayout.payoutNumber,
         date: newPayout.createdAt.toISOString(),
@@ -159,7 +174,7 @@ export const requestPayout = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Request Payout Error]:', error);
+    console.error("[Request Payout Error]:", error);
     return res.status(500).json({ error: error.message });
   }
 };
@@ -177,25 +192,28 @@ export const exportEarningsCSV = async (req, res) => {
     });
 
     if (!seller) {
-      return res.status(404).json({ error: 'Seller not found.' });
+      return res.status(404).json({ error: "Seller not found." });
     }
 
     const payouts = await prisma.payout.findMany({
       where: { sellerId: seller.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
-    let csvContent = 'Transaction ID,Date,Account,Amount (LKR),Status\n';
+    let csvContent = "Transaction ID,Date,Account,Amount (LKR),Status\n";
     payouts.forEach((p) => {
       const dateStr = new Date(p.createdAt).toLocaleDateString();
       csvContent += `${p.payoutNumber},${dateStr},"${p.bankAccountInfo}",${p.amount},${p.status}\n`;
     });
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=earnings_history_${Date.now()}.csv`);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=earnings_history_${Date.now()}.csv`,
+    );
     return res.status(200).send(csvContent);
   } catch (error) {
-    console.error('[Export CSV Error]:', error);
+    console.error("[Export CSV Error]:", error);
     return res.status(500).json({ error: error.message });
   }
 };

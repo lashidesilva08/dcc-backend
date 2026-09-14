@@ -876,7 +876,7 @@ async function main() {
   }
 
   // Seed sample Payout records for sellers
-  console.log('Seeding payouts for sellers...');
+  console.log("Seeding payouts for sellers...");
 
   for (let i = 0; i < sellers.length; i++) {
     const seller = sellers[i];
@@ -912,7 +912,34 @@ async function main() {
     });
   }
 
-  console.log('Payouts seeded successfully.');
+  console.log("Payouts seeded successfully.");
+
+  // 1. Update all order items for this seller to 'delivered'
+  await prisma.orderItem.updateMany({
+    where: {
+      sellerId: 6,
+    },
+    data: {
+      itemStatus: "delivered",
+    },
+  });
+
+  // 2. Fetch the unique order IDs linked to this seller's items
+  const sellerItems = await prisma.orderItem.findMany({
+    where: { sellerId: 6 },
+    select: { orderId: true },
+  });
+  const orderIds = sellerItems.map((item) => item.orderId);
+
+  // 3. Update those specific orders to 'paid'
+  await prisma.order.updateMany({
+    where: {
+      id: { in: orderIds },
+    },
+    data: {
+      paymentStatus: "paid",
+    },
+  });
 }
 
 function getVariantDefinitions(item) {
