@@ -9,7 +9,8 @@
     "dev": "nodemon src/server.js",
     "seed:delivery-demo": "node scripts/seedDeliverySamples.mjs",
     "reset:delivery-demo": "node scripts/resetDeliveryDemoState.mjs",
-    "test:delivery-contact": "node scripts/testDeliveryAndContact.mjs"
+    "test:delivery-contact": "node scripts/testDeliveryAndContact.mjs",
+    "create-admin": "node prisma/create-admin.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

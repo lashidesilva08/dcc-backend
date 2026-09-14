@@ -1,16 +1,49 @@
 import prisma from "../config/prisma.js";
-import {
-    generatePayHereHash,
-    verifyWebhookHash,
-    getPayHereCheckoutParams,
-} from "../services/payhere.service.js";
-import {
-    getMintCheckoutParams,
-    verifyMintWebhookHash,
-} from "../services/mint.service.js";
+import {generatePayHereHash,verifyWebhookHash,getPayHereCheckoutParams,} from "../services/payhere.service.js";
+import {getMintCheckoutParams,verifyMintWebhookHash,} from "../services/mint.service.js";
+import {getKokoCheckoutParams,verifyKokoWebhookHash,} from "../services/koko.service.js";
+import {getOnePayCheckoutParams,verifyOnePayWebhookHash,} from "../services/onepay.service.js";
 import emailService from "../services/email.service.js";
 
+const isKokoOnePayMockEnabled = process.env.MOCK_KOKO_ONEPAY === "true" && process.env.NODE_ENV !== "production"
 
+async function startMockPayment(req, res, order, method) {
+  await prisma.$transaction([
+    prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentMethod: method,
+        paymentStatus: "pending",
+        orderStatus: "pending_payment",
+      },
+    }),
+    prisma.transaction.upsert({
+      where: { orderId: order.id },
+      create: {
+        orderId: order.id,
+        transactionReference: `MOCK-${method}-${order.id}`,
+        paymentGateway: method,
+        amount: order.totalAmount,
+        currency: "LKR",
+        status: "pending",
+        gatewayResponse: { mode: "mock", method },
+      },
+      update: {
+        paymentGateway: method,
+        status: "pending",
+        gatewayResponse: { mode: "mock", method },
+      },
+    }),
+  ])
+
+  return res.status(200).json({
+    success: true,
+    requiresGateway: true,
+    mock: true,
+    method,
+    mockGatewayPath:`/payment/mock/${order.id}?method=${method.toLowerCase()}`,
+  })
+}
 // ─────────────────────────────────────────────
 // 1. INITIATE PAYMENT
 //    POST /api/v1/payments/initiate
@@ -24,7 +57,7 @@ export const initiatePayment = async (req, res) => {
             return res.status(400).json({ success: false, message: "orderId and method are required." });
         }
 
-        const allowedMethods = ["COD", "PAYHERE", "MINT"];
+        const allowedMethods = ["COD", "PAYHERE", "MINT", "KOKO", "ONEPAY"];
         if (!allowedMethods.includes(method.toUpperCase())) {
             return res.status(400).json({ success: false, message: `Payment method must be one of: ${allowedMethods.join(", ")}` });
         }
@@ -166,9 +199,242 @@ export const initiatePayment = async (req, res) => {
             });
         }
 
+        // ─── Koko Flow ────────────────────────────────────────────────
+        if (normalizedMethod === "KOKO") {
+
+            if (isKokoOnePayMockEnabled) {
+                return startMockPayment(req, res, order, "KOKO")
+            }
+            const merchantId = process.env.KOKO_MERCHANT_ID;
+
+            if (!merchantId) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Koko is not configured. Please contact support.",
+                });
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { id: req.user.id },
+                select: { id: true, name: true, email: true, phone: true },
+            });
+
+            await prisma.order.update({
+                where: { id: order.id },
+                data: { paymentMethod: "KOKO" },
+            });
+
+            const checkoutParams = getKokoCheckoutParams(order, user);
+
+            return res.status(200).json({
+                success: true,
+                method: "KOKO",
+                message: "Checkout params ready. Submit to Koko.",
+                checkoutParams,
+            });
+        }
+
+        // ─── OnePay Flow ──────────────────────────────────────────────
+        if (normalizedMethod === "ONEPAY") {
+
+            if (isKokoOnePayMockEnabled) {
+                return startMockPayment(req, res, order, "ONEPAY")
+            }
+            const appId = process.env.ONEPAY_APP_ID;
+
+            if (!appId) {
+                return res.status(500).json({
+                    success: false,
+                    message: "OnePay is not configured. Please contact support.",
+                });
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { id: req.user.id },
+                select: { id: true, name: true, email: true, phone: true },
+            });
+
+            await prisma.order.update({
+                where: { id: order.id },
+                data: { paymentMethod: "ONEPAY" },
+            });
+
+            const checkoutParams = getOnePayCheckoutParams(order, user);
+
+            return res.status(200).json({
+                success: true,
+                method: "ONEPAY",
+                message: "Checkout params ready. Submit to OnePay.",
+                checkoutParams,
+            });
+        }
+
     } catch (error) {
         console.error("initiatePayment error:", error);
         return res.status(500).json({ success: false, message: "Payment initiation failed.", error: error.message });
+    }
+};
+
+// ─────────────────────────────────────────────
+// SIMULATED PAYMENT WEBHOOK
+// POST /api/v1/payments/webhook
+// Auth: NONE
+//
+// Used by the frontend's simulated payment gateway.
+// This is NOT the real PayHere webhook.
+// ─────────────────────────────────────────────
+export const handleSimulatedPaymentWebhook = async (req, res) => {
+    try {
+        const paymentData = req.body;
+
+        console.log("[Simulated Payment Webhook] Received:", paymentData);
+
+        const orderId = Number(paymentData.order_id);
+        const statusCode = Number(paymentData.status_code);
+        const amount = Number(paymentData.amount || 0);
+
+        if (!orderId || !Number.isInteger(orderId)) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid order_id is required.",
+            });
+        }
+
+        if (![2, 0].includes(statusCode)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid payment status.",
+            });
+        }
+
+        // Find the order first
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                user: true,
+            },
+        });
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found.",
+            });
+        }
+
+        // ─────────────────────────────────────
+        // PAYMENT SUCCESS
+        // ─────────────────────────────────────
+        if (statusCode === 2) {
+            const [updatedOrder] = await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "paid",
+                        orderStatus: "confirmed",
+                    },
+                    include: {
+                        user: true,
+                    },
+                }),
+
+                prisma.transaction.upsert({
+                    where: { orderId },
+
+                    create: {
+                        orderId,
+                        transactionReference: `SIM-${orderId}-${Date.now()}`,
+                        paymentGateway:
+                            String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                        amount: amount || Number(order.totalAmount),
+                        currency: "LKR",
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+
+                    update: {
+                        paymentGateway:
+                            String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                        amount: amount || Number(order.totalAmount),
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                }),
+            ]);
+
+            // Send confirmation email
+            emailService
+                .sendOrderConfirmation(updatedOrder.user, {
+                    id: updatedOrder.orderNumber,
+                    total: updatedOrder.totalAmount,
+                })
+                .catch((err) =>
+                    console.error(
+                        "Error sending simulated payment confirmation email:",
+                        err
+                    )
+                );
+
+            console.log(
+                `[Simulated Payment Webhook] ✅ Order #${orderId} marked as PAID.`
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "Simulated payment processed successfully.",
+                orderId: updatedOrder.id,
+                orderNumber: updatedOrder.orderNumber,
+                paymentStatus: updatedOrder.paymentStatus,
+                orderStatus: updatedOrder.orderStatus,
+            });
+        }
+
+        // ─────────────────────────────────────
+        // PAYMENT PENDING
+        // ─────────────────────────────────────
+        await prisma.transaction.upsert({
+            where: { orderId },
+
+            create: {
+                orderId,
+                transactionReference: `SIM-PENDING-${orderId}`,
+                paymentGateway:
+                    String(paymentData.gateway || "SIMULATED").toUpperCase(),
+                amount: amount || Number(order.totalAmount),
+                currency: "LKR",
+                status: "pending",
+                gatewayResponse: paymentData,
+            },
+
+            update: {
+                status: "pending",
+                gatewayResponse: paymentData,
+            },
+        });
+
+        console.log(
+            `[Simulated Payment Webhook] ⏳ Order #${orderId} payment is pending.`
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Simulated payment is pending.",
+            orderId,
+        });
+
+    } catch (error) {
+        console.error(
+            "[Simulated Payment Webhook] Error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to process simulated payment.",
+            error: error.message,
+        });
     }
 };
 
@@ -538,3 +804,258 @@ export const handleMintWebhook = async (req, res) => {
         res.status(200).send("OK");
     }
 };
+// ─────────────────────────────────────────────
+// 6. KOKO WEBHOOK (Server Notification)
+//    POST /api/v1/payments/webhook/koko
+//    Auth: NONE — Koko servers call this directly
+// ─────────────────────────────────────────────
+export const handleKokoWebhook = async (req, res) => {
+    try {
+        const paymentData = req.body;
+        console.log("[Koko Webhook] Received:", paymentData);
+
+        const merchantSecret = process.env.KOKO_MERCHANT_SECRET;
+        const isVerified = verifyKokoWebhookHash(paymentData, merchantSecret);
+
+        if (!isVerified) {
+            console.error("[Koko Webhook] Hash verification FAILED. Possible tampered request.");
+            return res.status(400).send("Hash verification failed.");
+        }
+
+        const orderId = Number(paymentData.order_id);
+        const status = paymentData.status;
+        const kokoPaymentId = paymentData.transaction_id || paymentData.payment_id;
+
+        if (status === "SUCCESS" || status === "PAID" || status === "APPROVED") {
+            const [updatedOrder] = await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "paid",
+                        orderStatus: "confirmed",
+                    },
+                    include: { user: true },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: kokoPaymentId || `KOKO-${orderId}`,
+                        paymentGateway: "KOKO",
+                        amount: parseFloat(paymentData.amount),
+                        currency: paymentData.currency || "LKR",
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                    update: {
+                        transactionReference: kokoPaymentId || `KOKO-${orderId}`,
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                }),
+            ]);
+
+            emailService.sendOrderConfirmation(updatedOrder.user, {
+                id: updatedOrder.orderNumber,
+                total: updatedOrder.totalAmount,
+            }).catch((err) => console.error("Error sending Koko order confirmation email:", err));
+
+            console.log(`[Koko Webhook] ✅ Order #${orderId} marked as PAID.`);
+        } else {
+            const failedStatus = status === "CANCELLED" ? "cancelled" : "failed";
+
+            await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: { paymentStatus: failedStatus },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: kokoPaymentId || `KOKO-FAIL-${orderId}`,
+                        paymentGateway: "KOKO",
+                        amount: parseFloat(paymentData.amount) || 0,
+                        currency: paymentData.currency || "LKR",
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                    update: {
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                }),
+            ]);
+
+            console.log(`[Koko Webhook] ❌ Order #${orderId} payment ${failedStatus.toUpperCase()}.`);
+        }
+
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("[Koko Webhook] Error:", error);
+        res.status(200).send("OK");
+    }
+};
+
+// ─────────────────────────────────────────────
+// 7. ONEPAY WEBHOOK (Server Notification)
+//    POST /api/v1/payments/webhook/onepay
+//    Auth: NONE — OnePay servers call this directly
+// ─────────────────────────────────────────────
+export const handleOnePayWebhook = async (req, res) => {
+    try {
+        const paymentData = req.body;
+        console.log("[OnePay Webhook] Received:", paymentData);
+
+        const appSecret = process.env.ONEPAY_APP_SECRET;
+        const isVerified = verifyOnePayWebhookHash(paymentData, appSecret);
+
+        if (!isVerified) {
+            console.error("[OnePay Webhook] Hash verification FAILED. Possible tampered request.");
+            return res.status(400).send("Hash verification failed.");
+        }
+
+        const orderId = Number(paymentData.order_id || paymentData.reference_order_id);
+        const status = paymentData.status || paymentData.transaction_status;
+        const onePayPaymentId = paymentData.onepay_transaction_id || paymentData.transaction_id;
+
+        if (status === "SUCCESS" || status === "COMPLETED" || status === 1) {
+            const [updatedOrder] = await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        paymentStatus: "paid",
+                        orderStatus: "confirmed",
+                    },
+                    include: { user: true },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: onePayPaymentId || `ONEPAY-${orderId}`,
+                        paymentGateway: "ONEPAY",
+                        amount: parseFloat(paymentData.amount),
+                        currency: paymentData.currency || "LKR",
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                    update: {
+                        transactionReference: onePayPaymentId || `ONEPAY-${orderId}`,
+                        status: "success",
+                        gatewayResponse: paymentData,
+                        paidAt: new Date(),
+                    },
+                }),
+            ]);
+
+            emailService.sendOrderConfirmation(updatedOrder.user, {
+                id: updatedOrder.orderNumber,
+                total: updatedOrder.totalAmount,
+            }).catch((err) => console.error("Error sending OnePay order confirmation email:", err));
+
+            console.log(`[OnePay Webhook] ✅ Order #${orderId} marked as PAID.`);
+        } else {
+            const failedStatus = status === "CANCELLED" ? "cancelled" : "failed";
+
+            await prisma.$transaction([
+                prisma.order.update({
+                    where: { id: orderId },
+                    data: { paymentStatus: failedStatus },
+                }),
+                prisma.transaction.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        transactionReference: onePayPaymentId || `ONEPAY-FAIL-${orderId}`,
+                        paymentGateway: "ONEPAY",
+                        amount: parseFloat(paymentData.amount) || 0,
+                        currency: paymentData.currency || "LKR",
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                    update: {
+                        status: failedStatus,
+                        gatewayResponse: paymentData,
+                    },
+                }),
+            ]);
+
+            console.log(`[OnePay Webhook] ❌ Order #${orderId} payment ${failedStatus.toUpperCase()}.`);
+        }
+
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("[OnePay Webhook] Error:", error);
+        res.status(200).send("OK");
+    }
+};
+
+export const completeMockPayment = async (req, res) => {
+  try {
+    if (!isKokoOnePayMockEnabled) {
+      return res.status(404).json({ success: false })
+    }
+
+    const { orderId, outcome } = req.body
+
+    if (!['success', 'failed'].includes(outcome)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Outcome must be success or failed.',
+        })
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: Number(orderId) },
+    })
+
+    if (!order || order.userId !== req.user.id) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      })
+    }
+
+    if (!["KOKO", "ONEPAY"].includes(order.paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "This is not a mock KOKO or OnePay payment.",
+      })
+    }
+
+    const successful = outcome === "success"
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: successful ? "paid" : "failed",
+          orderStatus: successful ? "confirmed" : "payment_failed",
+        },
+      }),
+      prisma.transaction.update({
+        where: { orderId: order.id },
+        data: {
+          status: successful ? "success" : "failed",
+          ...(successful ? { paidAt: new Date() } : {}),
+        },
+      }),
+    ])
+
+    return res.json({
+      success: true,
+      paymentStatus: successful ? "paid" : "failed",
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Mock payment failed.",
+    })
+  }
+}
