@@ -79,6 +79,7 @@ model Seller {
   orderItems     OrderItem[]
   user           User            @relation(fields: [userId], references: [id])
   favouritedBy   FavouriteShop[] @relation("SellerFavouriteShops")
+  payouts        Payout[]
 }
 
 model FavouriteShop {
@@ -309,4 +310,16 @@ model FlashSaleItem {
   soldCount      Int            @default(0)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+}
+
+model Payout {
+  id              Int      @id @default(autoincrement())
+  payoutNumber    String   @unique
+  sellerId        Int
+  seller          Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  amount          Float
+  bankAccountInfo String
+  status          String   @default("pending") // "pending", "cleared", "failed"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

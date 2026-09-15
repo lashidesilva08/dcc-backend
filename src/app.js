@@ -22,7 +22,7 @@ import shopRoutes from "./routes/shopRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import HomeRoute from "./routes/homepageRoutes.js";
-
+import sellerEarningsRoutes from "./routes/sellerEarningsRoutes.js"
 
 const app = express();
 
@@ -68,6 +68,7 @@ app.use('/api/v1/seller/notifications',sellerNotificationRoutes
 )
 //app.use("/api/v1/seller-dashboard", sellerDashboardRoutes);
 app.use("/api/v1/home", HomeRoute);
+app.use("/api/v1/seller", sellerEarningsRoutes);
 
 
 export default app;
