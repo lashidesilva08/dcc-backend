@@ -1,6 +1,5 @@
 -- AlterTable
-ALTER TABLE "Seller" ADD COLUMN     "accountNumber" TEXT,
-ADD COLUMN     "bankName" TEXT;
+ALTER TABLE "Seller" ADD COLUMN     "accountNumber" TEXT;
 
 -- CreateTable
 CREATE TABLE "Payout" (

@@ -1,6 +1,7 @@
 import express from "express";
 import {getAllProducts,getCategories,getProductById,createProduct,updateProduct,deleteProduct,getProductReviews,submitReview
 } from "../controllers/productControllers.js";
+import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -13,9 +14,9 @@ router.get("/", getAllProducts);
 router.get("/:id", getProductById); 
 
 // 3. Protected Routes
-router.post("/", createProduct);          // Seller only logic
-router.put("/:id", updateProduct);        // Seller only logic
-router.delete("/:id", deleteProduct);     // Seller only logic
+router.post("/", protect,createProduct);          // Seller only logic
+router.put("/:id",protect, updateProduct);        // Seller only logic
+router.delete("/:id",protect, deleteProduct);     // Seller only logic
 router.post("/reviews", submitReview);    // Buyer only logic (Removed the duplicate line)
 
 export default router;

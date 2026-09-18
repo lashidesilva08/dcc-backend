@@ -71,7 +71,6 @@ model Seller {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   productCount   Int             @default(0)
-  bankName          String?
   bankAccountName   String?
   bankAccountNumber String?
   bankBranch        String?
@@ -108,8 +107,12 @@ model Listing {
   categoryId  Int
   title       String
   description String
-  status      String           @default("active")
+  type        String           @default("PRODUCT") // "PRODUCT" or "SERVICE"
+  status      String           @default("active") // "active", "paused", "draft"
   sold        Int              @default(0)
+  discountPrice Float?
+  discountStart DateTime?
+  discountEnd   DateTime?
   seller      Seller           @relation(fields: [sellerId], references: [id])
   category    Category         @relation(fields: [categoryId], references: [id])
   variants    ProductVariant[]

@@ -23,6 +23,7 @@ import serviceRoutes from "./routes/serviceRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import HomeRoute from "./routes/homepageRoutes.js";
 import sellerEarningsRoutes from "./routes/sellerEarningsRoutes.js"
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use("/api/v1/search", searchRoutes);
 app.use("/api/v1/seller", sellerRoutes);
 app.use('/api/v1/seller/notifications',sellerNotificationRoutes
 )
+app.use("/api/v1/upload", uploadRoutes);
 //app.use("/api/v1/seller-dashboard", sellerDashboardRoutes);
 app.use("/api/v1/home", HomeRoute);
 app.use("/api/v1/seller", sellerEarningsRoutes);

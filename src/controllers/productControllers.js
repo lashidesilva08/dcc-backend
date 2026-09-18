@@ -274,69 +274,104 @@ export const createProduct = async (req, res) => {
       categoryId,
       title,
       description,
+      type = "PRODUCT",
       price,
-      stock = 0,
-      attributes = {},
-      sku,
-      image,
+      stock,
+      images = [],
+      variants = [],
+      discount,
     } = req.body;
 
-    if (!sellerId || !categoryId || !title || price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'sellerId, categoryId, title and price are required.',
-      });
+    // Validation
+    if (!sellerId || !categoryId || !title || !price) {
+      return res.status(400).json({ message: "Missing required fields." });
     }
 
-    const listing = await prisma.listing.create({
-      data: {
-        sellerId: Number(sellerId),
-        categoryId: Number(categoryId),
-        title,
-        description: description || '',
-        status: 'active',
-        variants: {
-          create: {
-            price: Number(price),
-            stock: Number(stock),
-            sku: sku || null,
-            attributes,
-            status: 'active',
-            images: image
-              ? {
-                  create: {
-                    url: image,
-                    isMain: true,
-                  },
-                }
-              : undefined,
-          },
+    if (!images || images.length === 0) {
+      return res.status(400).json({ message: "At least one image is required." });
+    }
+
+    // Process listing creation inside a transaction
+    const newListing = await prisma.$transaction(async (tx) => {
+      // 1. Create the main Listing record
+      const listing = await tx.listing.create({
+        data: {
+          sellerId: Number(sellerId),
+          categoryId: Number(categoryId),
+          title: title.trim(),
+          description: description || "",
+          type: type, // "PRODUCT" or "SERVICE"
+          discountPrice: discount?.price ? Number(discount.price) : null,
+          discountStart: discount?.startDate ? new Date(discount.startDate) : null,
+          discountEnd: discount?.endDate ? new Date(discount.endDate) : null,
         },
-      },
-      include: {
-        variants: {
-          include: {
-            images: true,
+      });
+
+      // 2. Prepare Variant data
+      let variantList = [];
+
+      if (type === "PRODUCT" && variants.length > 0) {
+        // If specific variants were added by the seller
+        variantList = variants.map((v, idx) => ({
+          sku: `${title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)}-${Date.now()}-${idx}`,
+          price: Number(v.price) || Number(price),
+          stock: Number(v.stock) || 0,
+          attributes: v.attributes || {},
+        }));
+      } else {
+        // Default variant for standard product or service
+        variantList.push({
+          sku: `${title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)}-${Date.now()}`,
+          price: Number(price),
+          stock: type === "SERVICE" ? 0 : Number(stock) || 0,
+          attributes: {},
+        });
+      }
+
+      // 3. Create Variants and associate Image URLs
+      for (let i = 0; i < variantList.length; i++) {
+        const variantData = variantList[i];
+
+        // Attach images to the primary/first variant
+        const imageCreateData =
+          i === 0
+            ? images.map((url, idx) => ({
+                url: url,
+                isMain: idx === 0,
+              }))
+            : [];
+
+        await tx.productVariant.create({
+          data: {
+            listingId: listing.id,
+            sku: variantData.sku,
+            price: variantData.price,
+            stock: variantData.stock,
+            attributes: variantData.attributes,
+            images: {
+              create: imageCreateData,
+            },
           },
-        },
-        category: true,
-        seller: true,
-      },
+        });
+      }
+
+      // Increment seller product count
+      await tx.seller.update({
+        where: { id: Number(sellerId) },
+        data: { productCount: { increment: 1 } },
+      });
+
+      return listing;
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Product listing created successfully',
-      data: listing,
+      message: "Listing created successfully!",
+      data: newListing,
     });
   } catch (error) {
-    console.error('Create product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create product',
-      error: error.message,
-    });
+    console.error("Error creating product:", error);
+    return res.status(500).json({ message: error.message || "Server Error" });
   }
 };
 
