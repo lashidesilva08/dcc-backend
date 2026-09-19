@@ -523,36 +523,30 @@ export const updateProduct = async (req, res) => {
 // ============================================================
 export const deleteProduct = async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const { id } = req.params;
+    const listingId = Number(id);
 
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID.',
-      });
+    const existingListing = await prisma.listing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!existingListing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
     }
 
+    // Soft delete by updating status to disabled
     await prisma.listing.update({
-      where: {
-        id,
-      },
-      data: {
-        status: 'disabled',
-      },
+      where: { id: listingId },
+      data: { status: "disabled" },
     });
 
     return res.status(200).json({
       success: true,
-      message: `Product ${id} disabled successfully`,
+      message: "Listing deleted successfully",
     });
   } catch (error) {
-    console.error('Delete product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to delete product',
-      error: error.message,
-    });
+    console.error("Error deleting listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
