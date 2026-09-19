@@ -2,7 +2,6 @@ import express from "express";
 import {getAllProducts,getCategories,createProduct,updateProduct,deleteProduct,getProductReviews,submitReview, getProductById, getMyListings
 } from "../controllers/productControllers.js";
 import { protect } from "../middleware/auth.js";
-import { getProducts } from "../controllers/sellerControllers.js";
 
 const router = express.Router();
 

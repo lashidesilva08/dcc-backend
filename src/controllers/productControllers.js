@@ -140,78 +140,6 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-export const getProducts = async (req, res) => {
-  try {
-const rawSellerId = req.query.sellerId;
-let whereClause = {};
-if (rawSellerId) {
-      const inputId = Number(rawSellerId);
-
-      // 1. Look up the Seller profile associated with either the User ID (11) OR Seller ID (10)
-      const sellerProfile = await prisma.seller.findFirst({
-        where: {
-          OR: [
-            { userId: inputId }, // Matches User ID = 11
-            { id: inputId },     // Matches Seller ID = 10
-          ],
-        },
-      });
-
-      // If a seller profile exists, filter strictly by its ID (10)
-      if (sellerProfile) {
-        whereClause.sellerId = sellerProfile.id;
-      } else {
-        // If no seller profile is found for ID 11, return empty results immediately
-        return res.status(200).json({
-          success: true,
-          data: [],
-        });
-      }
-    }  
-
-// 2. Fetch listings strictly filtered by the resolved sellerId
-    const listings = await prisma.listing.findMany({
-      where: whereClause,
-      include: {
-        variants: {
-          include: {
-            images: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Format Prisma schema fields to fit frontend expectations
-    const formattedProducts = listings.map((listing) => {
-      const mainVariant = listing.variants[0] || {};
-      const totalStock = listing.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
-      const mainImage = mainVariant.images?.find((img) => img.isMain)?.url || mainVariant.images?.[0]?.url || "";
-
-      return {
-        _id: String(listing.id),
-        productId: mainVariant.sku || `PRD-${listing.id}`,
-        name: listing.title,
-        price: mainVariant.price || 0,
-        labelPrice: listing.discountPrice || mainVariant.price || 0,
-        stock: listing.type === "SERVICE" ? 999 : totalStock,
-        isAvailable: listing.status === "active" && (listing.type === "SERVICE" || totalStock > 0),
-        image: mainImage ? [mainImage] : [],
-        description: listing.description,
-        type: listing.type,
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: formattedProducts,
-    });
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 // GET LOGGED-IN SELLER'S OWN LISTINGS
 // GET /api/v1/products/my-listings   (protected)
 // The sellerId is resolved from the auth token, never from the client.
@@ -280,6 +208,7 @@ export const getMyListings = async (req, res) => {
         price: mainVariant.price || 0,
         labelPrice: listing.discountPrice || mainVariant.price || 0,
         stock: listing.type === 'SERVICE' ? 999 : totalStock,
+        status: listing.status || 'active',
         isAvailable:
           listing.status === 'active' && (listing.type === 'SERVICE' || totalStock > 0),
         image: mainImage ? [mainImage] : [],
@@ -336,87 +265,29 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const productId = Number(id);
-
-    if (!Number.isInteger(productId) || productId <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID. Backend product IDs must be numeric.',
-      });
-    }
-
-    const product = await prisma.listing.findFirst({
-      where: {
-        id: productId,
-        status: 'active',
-      },
+    const listing = await prisma.listing.findUnique({
+      where: { id: Number(id) },
       include: {
+        category: true,
         variants: {
-          where: {
-            status: 'active',
-          },
           include: {
             images: true,
           },
         },
-        reviews: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        category: true,
-        seller: {
-          select: {
-            id: true,
-            shopName: true,
-            shopUrl: true,
-            image: true,
-            rating: true,
-            reviewCount: true,
-          },
-        },
       },
     });
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: `Product with ID ${id} not found.`,
-      });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
     }
-
-    const ratings = product.reviews.map((review) => review.rating);
-
-    const averageRating =
-      ratings.length > 0
-        ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
-        : 4.5;
 
     return res.status(200).json({
       success: true,
-      message: 'Product details retrieved successfully',
-      data: {
-        ...product,
-        rating: Number(averageRating.toFixed(1)),
-        reviewCount: ratings.length,
-      },
+      data: listing,
     });
   } catch (error) {
-    console.error('Error fetching product details:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve product details',
-      error: error.message,
-    });
+    console.error("Error fetching listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -536,56 +407,114 @@ export const createProduct = async (req, res) => {
 // ============================================================
 export const updateProduct = async (req, res) => {
   try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID.',
-      });
-    }
+    const { id } = req.params;
+    const listingId = Number(id);
 
     const {
+      categoryId,
       title,
       description,
-      categoryId,
+      type,
       status,
+      price,
+      stock,
+      images = [],
+      variants = [],
+      discount,
     } = req.body;
 
-    const listing = await prisma.listing.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(title !== undefined ? { title } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(categoryId !== undefined ? { categoryId: Number(categoryId) } : {}),
-        ...(status !== undefined ? { status } : {}),
-      },
-      include: {
-        variants: {
-          include: {
-            images: true,
-          },
+    // Verify listing exists
+    const existingListing = await prisma.listing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!existingListing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
+    }
+
+    // Execute update in transaction
+    const updatedListing = await prisma.$transaction(async (tx) => {
+      // 1. Update core Listing table
+      const listing = await tx.listing.update({
+        where: { id: listingId },
+        data: {
+          categoryId: Number(categoryId),
+          title: title.trim(),
+          description: description || "",
+          type: type || "PRODUCT",
+          status: status || "active",
+          discountPrice: discount?.price ? Number(discount.price) : null,
+          discountStart: discount?.startDate ? new Date(discount.startDate) : null,
+          discountEnd: discount?.endDate ? new Date(discount.endDate) : null,
         },
-        category: true,
-        seller: true,
-      },
+      });
+
+      // 2. Wipe old variants & images to cleanly replace with updated list
+      await tx.productImage.deleteMany({
+        where: { variant: { listingId } },
+      });
+      await tx.productVariant.deleteMany({
+        where: { listingId },
+      });
+
+      // 3. Re-create main variant & sub-variants
+      const mainVariant = await tx.productVariant.create({
+        data: {
+          listingId: listing.id,
+          sku: `PRD-${listing.id}-MAIN`,
+          price: Number(price),
+          stock: type === "SERVICE" ? 0 : Number(stock),
+        },
+      });
+
+      // Attach images to main variant
+      if (images.length > 0) {
+        await tx.productImage.createMany({
+          data: images.map((url, idx) => ({
+            variantId: mainVariant.id,
+            url,
+            isMain: idx === 0,
+          })),
+        });
+      }
+
+      // Re-create additional custom variants
+      if (variants.length > 0 && type === "PRODUCT") {
+        for (let i = 0; i < variants.length; i++) {
+          const v = variants[i];
+          const createdVariant = await tx.productVariant.create({
+            data: {
+              listingId: listing.id,
+              sku: `PRD-${listing.id}-VAR-${i + 1}`,
+              price: Number(v.price || price),
+              stock: Number(v.stock || 0),
+              attributes: v.attributes || {},
+            },
+          });
+
+          if (images.length > 0) {
+            await tx.productImage.createMany({
+              data: images.map((url, idx) => ({
+                variantId: createdVariant.id,
+                url,
+                isMain: idx === 0,
+              })),
+            });
+          }
+        }
+      }
+
+      return listing;
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Product updated successfully',
-      data: listing,
+      message: "Listing updated successfully",
+      data: updatedListing,
     });
   } catch (error) {
-    console.error('Update product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update product',
-      error: error.message,
-    });
+    console.error("Error updating listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 

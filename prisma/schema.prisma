@@ -128,7 +128,7 @@ model ProductVariant {
   price          Float
   stock          Int             @default(0)
   status         String          @default("active")
-  attributes     Json
+  attributes     Json            @default("{}")
   listing        Listing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]
   images         ProductImage[]
