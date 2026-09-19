@@ -214,6 +214,15 @@ export const getMyListings = async (req, res) => {
         image: mainImage ? [mainImage] : [],
         description: listing.description,
         type: listing.type,
+        // Map variants for frontend rendering
+        allVariants: listing.variants.map((v) => ({
+          id: v.id,
+          sku: v.sku,
+          price: v.price,
+          stock: v.stock,
+          attributes: v.attributes,
+          images: v.images?.map((img) => img.url) || [],
+        })),
       };
     });
 
@@ -402,9 +411,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// ============================================================
 // UPDATE PRODUCT
-// ============================================================
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -518,9 +525,7 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// ============================================================
 // DELETE PRODUCT
-// ============================================================
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
