@@ -1,9 +1,96 @@
 import prisma from '../config/prisma.js'
 
-//import { PrismaClient } from '@prisma/client'
+// GET /api/v1/seller/products
+export const getProducts = async (req, res) => {
+  try {
+const rawSellerId = req.query.sellerId;
+let whereClause = {};
+if (rawSellerId) {
+      const inputId = Number(rawSellerId);
 
-//const prisma = new PrismaClient()
+      // 1. Look up the Seller profile associated with either the User ID (11) OR Seller ID (10)
+      const sellerProfile = await prisma.seller.findFirst({
+        where: {
+          OR: [
+            { userId: inputId }, // Matches User ID = 11
+            { id: inputId },     // Matches Seller ID = 10
+          ],
+        },
+      });
 
+      // If a seller profile exists, filter strictly by its ID (10)
+      if (sellerProfile) {
+        whereClause.sellerId = sellerProfile.id;
+      } else {
+        // If no seller profile is found for ID 11, return empty results immediately
+        return res.status(200).json({
+          success: true,
+          data: [],
+        });
+      }
+    }  
+
+// 2. Fetch listings strictly filtered by the resolved sellerId
+    const listings = await prisma.listing.findMany({
+      where: whereClause,
+      include: {
+        variants: {
+          include: {
+            images: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Format Prisma schema fields to fit frontend expectations
+    const formattedProducts = listings.map((listing) => {
+      const mainVariant = listing.variants[0] || {};
+      const totalStock = listing.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+      const mainImage = mainVariant.images?.find((img) => img.isMain)?.url || mainVariant.images?.[0]?.url || "";
+
+      return {
+        _id: String(listing.id),
+        productId: mainVariant.sku || `PRD-${listing.id}`,
+        name: listing.title,
+        price: mainVariant.price || 0,
+        labelPrice: listing.discountPrice || mainVariant.price || 0,
+        stock: listing.type === "SERVICE" ? 999 : totalStock,
+        isAvailable: listing.status === "active" && (listing.type === "SERVICE" || totalStock > 0),
+        image: mainImage ? [mainImage] : [],
+        description: listing.description,
+        type: listing.type,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// DELETE /api/v1/seller/products/:id
+export const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.listing.delete({
+      where: { id: Number(id) },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 /**
  * GET /api/v1/seller/bank-details
  *

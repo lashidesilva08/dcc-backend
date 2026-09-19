@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma.js'
 
 // ============================================================
 // GET ALL PRODUCTS
@@ -139,6 +137,164 @@ export const getAllProducts = async (req, res) => {
       message: 'Failed to fetch products',
       error: error.message,
     });
+  }
+};
+
+export const getProducts = async (req, res) => {
+  try {
+const rawSellerId = req.query.sellerId;
+let whereClause = {};
+if (rawSellerId) {
+      const inputId = Number(rawSellerId);
+
+      // 1. Look up the Seller profile associated with either the User ID (11) OR Seller ID (10)
+      const sellerProfile = await prisma.seller.findFirst({
+        where: {
+          OR: [
+            { userId: inputId }, // Matches User ID = 11
+            { id: inputId },     // Matches Seller ID = 10
+          ],
+        },
+      });
+
+      // If a seller profile exists, filter strictly by its ID (10)
+      if (sellerProfile) {
+        whereClause.sellerId = sellerProfile.id;
+      } else {
+        // If no seller profile is found for ID 11, return empty results immediately
+        return res.status(200).json({
+          success: true,
+          data: [],
+        });
+      }
+    }  
+
+// 2. Fetch listings strictly filtered by the resolved sellerId
+    const listings = await prisma.listing.findMany({
+      where: whereClause,
+      include: {
+        variants: {
+          include: {
+            images: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Format Prisma schema fields to fit frontend expectations
+    const formattedProducts = listings.map((listing) => {
+      const mainVariant = listing.variants[0] || {};
+      const totalStock = listing.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+      const mainImage = mainVariant.images?.find((img) => img.isMain)?.url || mainVariant.images?.[0]?.url || "";
+
+      return {
+        _id: String(listing.id),
+        productId: mainVariant.sku || `PRD-${listing.id}`,
+        name: listing.title,
+        price: mainVariant.price || 0,
+        labelPrice: listing.discountPrice || mainVariant.price || 0,
+        stock: listing.type === "SERVICE" ? 999 : totalStock,
+        isAvailable: listing.status === "active" && (listing.type === "SERVICE" || totalStock > 0),
+        image: mainImage ? [mainImage] : [],
+        description: listing.description,
+        type: listing.type,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET LOGGED-IN SELLER'S OWN LISTINGS
+// GET /api/v1/products/my-listings   (protected)
+// The sellerId is resolved from the auth token, never from the client.
+// ============================================================
+export const getMyListings = async (req, res) => {
+  try {
+    // `protect` attaches the authenticated user. Support both shapes.
+    const authUserId = Number(req.user?.id ?? req.user?.userId);
+
+    if (!Number.isInteger(authUserId) || authUserId <= 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized.',
+        data: [],
+      });
+    }
+
+    // Resolve the Seller profile that belongs to this user (User.id -> Seller.userId)
+    const sellerProfile =
+      req.user?.seller?.id
+        ? { id: Number(req.user.seller.id) }
+        : await prisma.seller.findUnique({
+            where: { userId: authUserId },
+            select: { id: true },
+          });
+
+    if (!sellerProfile) {
+      return res.status(403).json({
+        success: false,
+        message: 'No seller profile found for this account.',
+        data: [],
+      });
+    }
+
+    // Strictly scoped to the logged-in seller
+    const listings = await prisma.listing.findMany({
+      where: {
+        sellerId: sellerProfile.id,
+        status: {
+          not: 'disabled',
+        },
+      },
+      include: {
+        variants: {
+          include: {
+            images: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Same shape the seller dashboard already expects
+    const formattedProducts = listings.map((listing) => {
+      const mainVariant = listing.variants[0] || {};
+      const totalStock = listing.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+      const mainImage =
+        mainVariant.images?.find((img) => img.isMain)?.url ||
+        mainVariant.images?.[0]?.url ||
+        '';
+
+      return {
+        _id: String(listing.id),
+        productId: mainVariant.sku || `PRD-${listing.id}`,
+        name: listing.title,
+        price: mainVariant.price || 0,
+        labelPrice: listing.discountPrice || mainVariant.price || 0,
+        stock: listing.type === 'SERVICE' ? 999 : totalStock,
+        isAvailable:
+          listing.status === 'active' && (listing.type === 'SERVICE' || totalStock > 0),
+        image: mainImage ? [mainImage] : [],
+        description: listing.description,
+        type: listing.type,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+    });
+  } catch (error) {
+    console.error('Error fetching seller listings:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 

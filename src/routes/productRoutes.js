@@ -1,12 +1,14 @@
 import express from "express";
-import {getAllProducts,getCategories,getProductById,createProduct,updateProduct,deleteProduct,getProductReviews,submitReview
+import {getAllProducts,getCategories,createProduct,updateProduct,deleteProduct,getProductReviews,submitReview, getProductById, getMyListings
 } from "../controllers/productControllers.js";
 import { protect } from "../middleware/auth.js";
+import { getProducts } from "../controllers/sellerControllers.js";
 
 const router = express.Router();
 
 // 1. SPECIFIC Public Routes (Always put static paths first!)
 router.get("/categories", getCategories);
+router.get("/my-listings", protect, getMyListings); 
 router.get("/reviews/:productId", getProductReviews);
 
 // 2. DYNAMIC Public Routes (Put parameter paths at the bottom)
