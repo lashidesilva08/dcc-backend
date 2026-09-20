@@ -876,44 +876,265 @@ async function main() {
   }
 
   // Seed sample Payout records for sellers
-  console.log("Seeding payouts for sellers...");
+  // console.log("Seeding payouts for sellers...");
 
-  for (let i = 0; i < sellers.length; i++) {
-    const seller = sellers[i];
+  // for (let i = 0; i < sellers.length; i++) {
+  //   const seller = sellers[i];
 
-    await prisma.payout.createMany({
-      data: [
-        {
-          payoutNumber: `PAY-${1000 + i}-01`,
-          sellerId: seller.id,
-          amount: 45000.0,
-          bankAccountInfo: "HNB Bank - ****4829",
-          status: "cleared",
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-        },
-        {
-          payoutNumber: `PAY-${1000 + i}-02`,
-          sellerId: seller.id,
-          amount: 62000.0,
-          bankAccountInfo: "Commercial Bank - ****1102",
-          status: "cleared",
-          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-        },
-        {
-          payoutNumber: `PAY-${1000 + i}-03`,
-          sellerId: seller.id,
-          amount: 28500.0,
-          bankAccountInfo: "Sampath Bank - ****9043",
-          status: "pending",
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-        },
-      ],
-      skipDuplicates: true,
+  //   await prisma.payout.createMany({
+  //     data: [
+  //       {
+  //         payoutNumber: `PAY-${1000 + i}-01`,
+  //         sellerId: seller.id,
+  //         amount: 45000.0,
+  //         bankAccountInfo: "HNB Bank - ****4829",
+  //         status: "cleared",
+  //         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+  //       },
+  //       {
+  //         payoutNumber: `PAY-${1000 + i}-02`,
+  //         sellerId: seller.id,
+  //         amount: 62000.0,
+  //         bankAccountInfo: "Commercial Bank - ****1102",
+  //         status: "cleared",
+  //         createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
+  //       },
+  //       {
+  //         payoutNumber: `PAY-${1000 + i}-03`,
+  //         sellerId: seller.id,
+  //         amount: 28500.0,
+  //         bankAccountInfo: "Sampath Bank - ****9043",
+  //         status: "pending",
+  //         createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+  //       },
+  //     ],
+  //     skipDuplicates: true,
+  //   });
+  // }
+
+  // console.log("Payouts seeded successfully.");
+
+  //=============================================
+
+  //seed sample data for payout whose sellerid=10 with sample metrices
+  const sellerId = 10;
+
+  console.log(`Seeding payout and sales data for Seller ID: ${sellerId}...`);
+
+  // 1. Ensure Seller ID 10 has bank details configured
+  const seller = await prisma.seller.upsert({
+    where: { id: sellerId },
+    update: {
+      bankName: "Commercial Bank of Ceylon",
+      bankAccountName: "DCC Merchant Store",
+      bankAccountNumber: "8001234567",
+      bankBranch: "Colombo Fort",
+      commissionRate: 10.0,
+    },
+    create: {
+      id: sellerId,
+      userId: 10,
+      shopName: "DCC Fashion Hub",
+      shopUrl: "dcc-fashion-hub",
+      businessType: "RETAIL",
+      status: "approved",
+      commissionRate: 10.0,
+      bankName: "Commercial Bank of Ceylon",
+      bankAccountName: "DCC Merchant Store",
+      bankAccountNumber: "8001234567",
+      bankBranch: "Colombo Fort",
+    },
+  });
+
+  // 2. Create sample Payout records for Seller 10
+  const payoutsData = [
+    {
+      payoutNumber: "PAY-2026-001",
+      sellerId: sellerId,
+      amount: 45000.0,
+      bankAccountInfo: "Commercial Bank - 8001234567 (DCC Merchant Store)",
+      status: "cleared",
+      createdAt: new Date("2026-08-15T10:00:00Z"),
+    },
+    {
+      payoutNumber: "PAY-2026-002",
+      sellerId: sellerId,
+      amount: 28500.0,
+      bankAccountInfo: "Commercial Bank - 8001234567 (DCC Merchant Store)",
+      status: "cleared",
+      createdAt: new Date("2026-09-01T10:00:00Z"),
+    },
+    {
+      payoutNumber: "PAY-2026-003",
+      sellerId: sellerId,
+      amount: 15200.0,
+      bankAccountInfo: "Commercial Bank - 8001234567 (DCC Merchant Store)",
+      status: "pending",
+      createdAt: new Date("2026-09-15T10:00:00Z"),
+    },
+    {
+      payoutNumber: "PAY-2026-004",
+      sellerId: sellerId,
+      amount: 5000.0,
+      bankAccountInfo: "Commercial Bank - 8001234567 (DCC Merchant Store)",
+      status: "failed",
+      createdAt: new Date("2026-09-18T10:00:00Z"),
+    },
+  ];
+
+  for (const payout of payoutsData) {
+    await prisma.payout.upsert({
+      where: { payoutNumber: payout.payoutNumber },
+      update: payout,
+      create: payout,
     });
   }
 
-  console.log("Payouts seeded successfully.");
+  // 3. (Optional) Create associated Orders & OrderItems to back revenue metrics
+  // Check if a category exists or create a default category
+  let category = await prisma.category.findFirst();
+  if (!category) {
+    category = await prisma.category.create({
+      data: { name: "Apparel" },
+    });
+  }
 
+  // Create or get a sample listing for Seller 10
+  let listing = await prisma.listing.findFirst({
+    where: { sellerId: sellerId, title: "Premium Denim Jacket" },
+    include: { variants: true },
+  });
+
+  if (!listing) {
+    listing = await prisma.listing.create({
+      data: {
+        sellerId: sellerId,
+        categoryId: category.id,
+        title: "Premium Denim Jacket",
+        description: "High quality denim jacket",
+        type: "PRODUCT",
+        status: "active",
+        variants: {
+          create: {
+            sku: `SELLER10-JKT-L-${Date.now()}`,
+            price: 5000.0,
+            stock: 25,
+            attributes: { size: "L", color: "Blue" },
+          },
+        },
+      },
+      include: { variants: true },
+    });
+  }
+
+  const variantId = listing.variants[0].id;
+
+  // Seed sample completed orders for seller metrics
+  const orderData = [
+    {
+      orderNumber: "ORD-2026-101",
+      totalAmount: 10000.0,
+      paymentMethod: "CARD",
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "123 Main St, Colombo",
+      quantity: 2,
+      unitPrice: 5000.0,
+      subtotal: 10000.0,
+    },
+    {
+      orderNumber: "ORD-2026-102",
+      totalAmount: 5000.0,
+      paymentMethod: "CARD",
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "45 Galle Rd, Kandy",
+      quantity: 1,
+      unitPrice: 5000.0,
+      subtotal: 5000.0,
+    },
+    {
+      orderNumber: "ORD-2026-103",
+      totalAmount: 25000.0,
+      paymentMethod: "CARD",
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "78 Kandy Rd, Kurunegala",
+      quantity: 5,
+      unitPrice: 5000.0,
+      subtotal: 25000.0,
+      createdAt: new Date("2026-08-10T10:00:00Z"),
+    },
+    {
+      orderNumber: "ORD-2026-104",
+      totalAmount: 50000.0,
+      paymentMethod: "CARD",
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "12 Lake Rd, Kandy",
+      quantity: 10,
+      unitPrice: 5000.0,
+      subtotal: 50000.0,
+      createdAt: new Date("2026-08-25T10:00:00Z"),
+    },
+    {
+      orderNumber: "ORD-2026-105",
+      totalAmount: 50000.0,
+      paymentMethod: "CARD",
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "56 Marine Dr, Galle",
+      quantity: 10,
+      unitPrice: 5000.0,
+      subtotal: 50000.0,
+      createdAt: new Date("2026-09-05T10:00:00Z"),
+    },
+  ];
+
+  for (const ord of orderData) {
+    const order = await prisma.order.upsert({
+      where: { orderNumber: ord.orderNumber },
+      update: {},
+      create: {
+        userId: seller.userId,
+        orderNumber: ord.orderNumber,
+        totalAmount: ord.totalAmount,
+        paymentMethod: ord.paymentMethod,
+        paymentStatus: ord.paymentStatus,
+        orderStatus: ord.orderStatus,
+        deliveryAddress: ord.deliveryAddress,
+        createdAt: ord.createdAt, // <-- added
+        orderItems: {
+          create: {
+            variantId: variantId,
+            sellerId: sellerId,
+            quantity: ord.quantity,
+            unitPrice: ord.unitPrice,
+            subtotal: ord.subtotal,
+            itemStatus: "delivered",
+          },
+        },
+      },
+    });
+
+    await prisma.transaction.upsert({
+      where: { orderId: order.id },
+      update: {},
+      create: {
+        orderId: order.id,
+        transactionReference: `TXN-${ord.orderNumber}`,
+        paymentGateway: "STRIPE",
+        amount: ord.totalAmount,
+        currency: "LKR",
+        status: "completed",
+        paidAt: new Date(),
+      },
+    });
+  }
+
+  console.log("Seed completed successfully for Seller 10!");
+
+  //=========================================
   // 1. Update all order items for this seller to 'delivered'
   await prisma.orderItem.updateMany({
     where: {
