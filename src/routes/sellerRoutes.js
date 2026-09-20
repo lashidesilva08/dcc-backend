@@ -37,7 +37,7 @@ router.get("/dashboard", getSellerDashboard);
 // Seller payout bank details
 // ---------------------------------------------------------
 
-router.get("/bank-details", getSellerBankDetails);
-router.put("/bank-details", updateSellerBankDetails);
+router.get("/bank-details",protect, getSellerBankDetails);
+router.put("/bank-details", protect, updateSellerBankDetails);
 
 export default router;
