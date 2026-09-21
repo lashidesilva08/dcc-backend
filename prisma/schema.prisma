@@ -111,8 +111,12 @@ model Listing {
   categoryId  Int
   title       String
   description String
-  status      String           @default("active")
+  type        String           @default("PRODUCT") // "PRODUCT" or "SERVICE"
+  status      String           @default("active") // "active", "paused", "draft"
   sold        Int              @default(0)
+  discountPrice Float?
+  discountStart DateTime?
+  discountEnd   DateTime?
   seller      Seller           @relation(fields: [sellerId], references: [id])
   category    Category         @relation(fields: [categoryId], references: [id])
   variants    ProductVariant[]
@@ -128,7 +132,7 @@ model ProductVariant {
   price          Float
   stock          Int             @default(0)
   status         String          @default("active")
-  attributes     Json
+  attributes     Json            @default("{}")
   listing        Listing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]
   images         ProductImage[]

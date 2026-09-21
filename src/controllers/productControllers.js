@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma.js'
 
 // ============================================================
 // GET ALL PRODUCTS
@@ -142,6 +140,102 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
+// GET LOGGED-IN SELLER'S OWN LISTINGS
+// GET /api/v1/products/my-listings   (protected)
+// The sellerId is resolved from the auth token, never from the client.
+// ============================================================
+export const getMyListings = async (req, res) => {
+  try {
+    // `protect` attaches the authenticated user. Support both shapes.
+    const authUserId = Number(req.user?.id ?? req.user?.userId);
+
+    if (!Number.isInteger(authUserId) || authUserId <= 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized.',
+        data: [],
+      });
+    }
+
+    // Resolve the Seller profile that belongs to this user (User.id -> Seller.userId)
+    const sellerProfile =
+      req.user?.seller?.id
+        ? { id: Number(req.user.seller.id) }
+        : await prisma.seller.findUnique({
+            where: { userId: authUserId },
+            select: { id: true },
+          });
+
+    if (!sellerProfile) {
+      return res.status(403).json({
+        success: false,
+        message: 'No seller profile found for this account.',
+        data: [],
+      });
+    }
+
+    // Strictly scoped to the logged-in seller
+    const listings = await prisma.listing.findMany({
+      where: {
+        sellerId: sellerProfile.id,
+        status: {
+          not: 'disabled',
+        },
+      },
+      include: {
+        variants: {
+          include: {
+            images: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Same shape the seller dashboard already expects
+    const formattedProducts = listings.map((listing) => {
+      const mainVariant = listing.variants[0] || {};
+      const totalStock = listing.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
+      const mainImage =
+        mainVariant.images?.find((img) => img.isMain)?.url ||
+        mainVariant.images?.[0]?.url ||
+        '';
+
+      return {
+        _id: String(listing.id),
+        productId: mainVariant.sku || `PRD-${listing.id}`,
+        name: listing.title,
+        price: mainVariant.price || 0,
+        labelPrice: listing.discountPrice || mainVariant.price || 0,
+        stock: listing.type === 'SERVICE' ? 999 : totalStock,
+        status: listing.status || 'active',
+        isAvailable:
+          listing.status === 'active' && (listing.type === 'SERVICE' || totalStock > 0),
+        image: mainImage ? [mainImage] : [],
+        description: listing.description,
+        type: listing.type,
+        // Map variants for frontend rendering
+        allVariants: listing.variants.map((v) => ({
+          id: v.id,
+          sku: v.sku,
+          price: v.price,
+          stock: v.stock,
+          attributes: v.attributes,
+          images: v.images?.map((img) => img.url) || [],
+        })),
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+    });
+  } catch (error) {
+    console.error('Error fetching seller listings:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ============================================================
 // GET CATEGORIES
 // GET /api/v1/products/categories
@@ -180,87 +274,29 @@ export const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const productId = Number(id);
-
-    if (!Number.isInteger(productId) || productId <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID. Backend product IDs must be numeric.',
-      });
-    }
-
-    const product = await prisma.listing.findFirst({
-      where: {
-        id: productId,
-        status: 'active',
-      },
+    const listing = await prisma.listing.findUnique({
+      where: { id: Number(id) },
       include: {
+        category: true,
         variants: {
-          where: {
-            status: 'active',
-          },
           include: {
             images: true,
           },
         },
-        reviews: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        category: true,
-        seller: {
-          select: {
-            id: true,
-            shopName: true,
-            shopUrl: true,
-            image: true,
-            rating: true,
-            reviewCount: true,
-          },
-        },
       },
     });
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: `Product with ID ${id} not found.`,
-      });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
     }
-
-    const ratings = product.reviews.map((review) => review.rating);
-
-    const averageRating =
-      ratings.length > 0
-        ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
-        : 4.5;
 
     return res.status(200).json({
       success: true,
-      message: 'Product details retrieved successfully',
-      data: {
-        ...product,
-        rating: Number(averageRating.toFixed(1)),
-        reviewCount: ratings.length,
-      },
+      data: listing,
     });
   } catch (error) {
-    console.error('Error fetching product details:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve product details',
-      error: error.message,
-    });
+    console.error("Error fetching listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -274,165 +310,248 @@ export const createProduct = async (req, res) => {
       categoryId,
       title,
       description,
+      type = "PRODUCT",
       price,
-      stock = 0,
-      attributes = {},
-      sku,
-      image,
+      stock,
+      images = [],
+      variants = [],
+      discount,
     } = req.body;
 
-    if (!sellerId || !categoryId || !title || price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'sellerId, categoryId, title and price are required.',
-      });
+    // Validation
+    if (!sellerId || !categoryId || !title || !price) {
+      return res.status(400).json({ message: "Missing required fields." });
     }
 
-    const listing = await prisma.listing.create({
-      data: {
-        sellerId: Number(sellerId),
-        categoryId: Number(categoryId),
-        title,
-        description: description || '',
-        status: 'active',
-        variants: {
-          create: {
-            price: Number(price),
-            stock: Number(stock),
-            sku: sku || null,
-            attributes,
-            status: 'active',
-            images: image
-              ? {
-                  create: {
-                    url: image,
-                    isMain: true,
-                  },
-                }
-              : undefined,
-          },
+    if (!images || images.length === 0) {
+      return res.status(400).json({ message: "At least one image is required." });
+    }
+
+    // Process listing creation inside a transaction
+    const newListing = await prisma.$transaction(async (tx) => {
+      // 1. Create the main Listing record
+      const listing = await tx.listing.create({
+        data: {
+          sellerId: Number(sellerId),
+          categoryId: Number(categoryId),
+          title: title.trim(),
+          description: description || "",
+          type: type, // "PRODUCT" or "SERVICE"
+          discountPrice: discount?.price ? Number(discount.price) : null,
+          discountStart: discount?.startDate ? new Date(discount.startDate) : null,
+          discountEnd: discount?.endDate ? new Date(discount.endDate) : null,
         },
-      },
-      include: {
-        variants: {
-          include: {
-            images: true,
+      });
+
+      // 2. Prepare Variant data
+      let variantList = [];
+
+      if (type === "PRODUCT" && variants.length > 0) {
+        // If specific variants were added by the seller
+        variantList = variants.map((v, idx) => ({
+          sku: `${title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)}-${Date.now()}-${idx}`,
+          price: Number(v.price) || Number(price),
+          stock: Number(v.stock) || 0,
+          attributes: v.attributes || {},
+        }));
+      } else {
+        // Default variant for standard product or service
+        variantList.push({
+          sku: `${title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)}-${Date.now()}`,
+          price: Number(price),
+          stock: type === "SERVICE" ? 0 : Number(stock) || 0,
+          attributes: {},
+        });
+      }
+
+      // 3. Create Variants and associate Image URLs
+      for (let i = 0; i < variantList.length; i++) {
+        const variantData = variantList[i];
+
+        // Attach images to the primary/first variant
+        const imageCreateData =
+          i === 0
+            ? images.map((url, idx) => ({
+                url: url,
+                isMain: idx === 0,
+              }))
+            : [];
+
+        await tx.productVariant.create({
+          data: {
+            listingId: listing.id,
+            sku: variantData.sku,
+            price: variantData.price,
+            stock: variantData.stock,
+            attributes: variantData.attributes,
+            images: {
+              create: imageCreateData,
+            },
           },
-        },
-        category: true,
-        seller: true,
-      },
+        });
+      }
+
+      // Increment seller product count
+      await tx.seller.update({
+        where: { id: Number(sellerId) },
+        data: { productCount: { increment: 1 } },
+      });
+
+      return listing;
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Product listing created successfully',
-      data: listing,
+      message: "Listing created successfully!",
+      data: newListing,
     });
   } catch (error) {
-    console.error('Create product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create product',
-      error: error.message,
-    });
+    console.error("Error creating product:", error);
+    return res.status(500).json({ message: error.message || "Server Error" });
   }
 };
 
-// ============================================================
 // UPDATE PRODUCT
-// ============================================================
 export const updateProduct = async (req, res) => {
   try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID.',
-      });
-    }
+    const { id } = req.params;
+    const listingId = Number(id);
 
     const {
+      categoryId,
       title,
       description,
-      categoryId,
+      type,
       status,
+      price,
+      stock,
+      images = [],
+      variants = [],
+      discount,
     } = req.body;
 
-    const listing = await prisma.listing.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(title !== undefined ? { title } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(categoryId !== undefined ? { categoryId: Number(categoryId) } : {}),
-        ...(status !== undefined ? { status } : {}),
-      },
-      include: {
-        variants: {
-          include: {
-            images: true,
-          },
+    // Verify listing exists
+    const existingListing = await prisma.listing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!existingListing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
+    }
+
+    // Execute update in transaction
+    const updatedListing = await prisma.$transaction(async (tx) => {
+      // 1. Update core Listing table
+      const listing = await tx.listing.update({
+        where: { id: listingId },
+        data: {
+          categoryId: Number(categoryId),
+          title: title.trim(),
+          description: description || "",
+          type: type || "PRODUCT",
+          status: status || "active",
+          discountPrice: discount?.price ? Number(discount.price) : null,
+          discountStart: discount?.startDate ? new Date(discount.startDate) : null,
+          discountEnd: discount?.endDate ? new Date(discount.endDate) : null,
         },
-        category: true,
-        seller: true,
-      },
+      });
+
+      // 2. Wipe old variants & images to cleanly replace with updated list
+      await tx.productImage.deleteMany({
+        where: { variant: { listingId } },
+      });
+      await tx.productVariant.deleteMany({
+        where: { listingId },
+      });
+
+      // 3. Re-create main variant & sub-variants
+      const mainVariant = await tx.productVariant.create({
+        data: {
+          listingId: listing.id,
+          sku: `PRD-${listing.id}-MAIN`,
+          price: Number(price),
+          stock: type === "SERVICE" ? 0 : Number(stock),
+        },
+      });
+
+      // Attach images to main variant
+      if (images.length > 0) {
+        await tx.productImage.createMany({
+          data: images.map((url, idx) => ({
+            variantId: mainVariant.id,
+            url,
+            isMain: idx === 0,
+          })),
+        });
+      }
+
+      // Re-create additional custom variants
+      if (variants.length > 0 && type === "PRODUCT") {
+        for (let i = 0; i < variants.length; i++) {
+          const v = variants[i];
+          const createdVariant = await tx.productVariant.create({
+            data: {
+              listingId: listing.id,
+              sku: `PRD-${listing.id}-VAR-${i + 1}`,
+              price: Number(v.price || price),
+              stock: Number(v.stock || 0),
+              attributes: v.attributes || {},
+            },
+          });
+
+          if (images.length > 0) {
+            await tx.productImage.createMany({
+              data: images.map((url, idx) => ({
+                variantId: createdVariant.id,
+                url,
+                isMain: idx === 0,
+              })),
+            });
+          }
+        }
+      }
+
+      return listing;
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Product updated successfully',
-      data: listing,
+      message: "Listing updated successfully",
+      data: updatedListing,
     });
   } catch (error) {
-    console.error('Update product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update product',
-      error: error.message,
-    });
+    console.error("Error updating listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ============================================================
 // DELETE PRODUCT
-// ============================================================
 export const deleteProduct = async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const { id } = req.params;
+    const listingId = Number(id);
 
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid product ID.',
-      });
+    const existingListing = await prisma.listing.findUnique({
+      where: { id: listingId },
+    });
+
+    if (!existingListing) {
+      return res.status(404).json({ success: false, message: "Listing not found" });
     }
 
+    // Soft delete by updating status to disabled
     await prisma.listing.update({
-      where: {
-        id,
-      },
-      data: {
-        status: 'disabled',
-      },
+      where: { id: listingId },
+      data: { status: "disabled" },
     });
 
     return res.status(200).json({
       success: true,
-      message: `Product ${id} disabled successfully`,
+      message: "Listing deleted successfully",
     });
   } catch (error) {
-    console.error('Delete product error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to delete product',
-      error: error.message,
-    });
+    console.error("Error deleting listing:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
