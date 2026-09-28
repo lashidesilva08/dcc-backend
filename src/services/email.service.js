@@ -9,6 +9,7 @@ import OrderConfirmationEmail from "../templates/OrderConfirmationEmail.js";
 import OrderStatusEmail from "../templates/OrderStatusEmail.js";
 import SellerApprovedEmail from "../templates/SellerApprovedEmail.js";
 import SellerRejectedEmail from "../templates/SellerRejectedEmail.js";
+import SellerAccountStatusEmail from "../templates/SellerAccountStatusEmail.js";
 
 class EmailService {
 
@@ -74,6 +75,22 @@ class EmailService {
     return this.sendTemplate(
       SellerRejectedEmail({ businessName: user.businessName, reason }),
       "Seller Application Status",
+      user.email
+    );
+  }
+
+  /**
+   * Suspended / reinstated / removed seller account.
+   */
+  async sendSellerStatusChange(user, { subject, heading, message, reason }) {
+    return this.sendTemplate(
+      SellerAccountStatusEmail({
+        businessName: user.businessName,
+        heading,
+        message,
+        reason,
+      }),
+      subject,
       user.email
     );
   }

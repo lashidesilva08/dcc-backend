@@ -1,23 +1,55 @@
-import express from "express";
-import { getPendingSellers, approveSeller, getSalesReport, getDisputes, getDashboard, rejectSeller, suspendSeller, getAllOrders, getDeliveryProviders, approveDeliveryProvider, rejectDeliveryProvider } from "../controllers/adminControllers.js";
-import { protect, requireRole } from "../middleware/auth.js";
+import express from 'express'
 
-const router = express.Router();
+import {
+  getSalesReport,
+  getDisputes,
+  getAllOrders,
+  getDeliveryProviders,
+  approveDeliveryProvider,
+  rejectDeliveryProvider,
+} from '../controllers/adminControllers.js'
 
-router.use(protect);
-router.use(requireRole('SUPER_ADMIN', 'ADMIN'));
+import { getAdminDashboard } from '../controllers/adminDashboardController.js'
 
-router.get("/sellers/pending", getPendingSellers);
-router.patch("/sellers/:id/approve", approveSeller);
-router.get("/reports/sales", getSalesReport);
-router.get("/disputes", getDisputes);
-router.get("/getdashboarddata", getDashboard);
-router.patch("/sellers/:id/reject", rejectSeller);
-router.patch("/sellers/:id/suspend", suspendSeller);
-router.get("/orders", getAllOrders);
+import {
+  listSellers,
+  getPendingSellers,
+  getSellerById,
+  updateSellerStatus,
+  approveSeller,
+  rejectSeller,
+  suspendSeller,
+} from '../controllers/Adminsellercontroller.js'
 
-router.get("/delivery-providers", getDeliveryProviders);
-router.put("/delivery-providers/:id/approve", approveDeliveryProvider);
-router.put("/delivery-providers/:id/reject", rejectDeliveryProvider);
+import { adminAuth } from '../middleware/Adminmiddleware.js'
 
-export default router;
+const router = express.Router()
+
+// Every route below requires a valid JWT and an admin role.
+router.use(...adminAuth)
+
+/* Dashboard */
+router.get('/dashboard', getAdminDashboard)
+router.get('/getdashboarddata', getAdminDashboard) // legacy alias
+
+/* Seller management */
+router.get('/sellers', listSellers)
+router.get('/sellers/pending', getPendingSellers) // must stay above /sellers/:id
+router.get('/sellers/:id', getSellerById)
+router.patch('/sellers/:id/status', updateSellerStatus)
+
+// Legacy per-action endpoints (same logic as PATCH /:id/status)
+router.patch('/sellers/:id/approve', approveSeller)
+router.patch('/sellers/:id/reject', rejectSeller)
+router.patch('/sellers/:id/suspend', suspendSeller)
+
+/* Other admin features (unchanged) */
+router.get('/reports/sales', getSalesReport)
+router.get('/disputes', getDisputes)
+router.get('/orders', getAllOrders)
+
+router.get('/delivery-providers', getDeliveryProviders)
+router.put('/delivery-providers/:id/approve', approveDeliveryProvider)
+router.put('/delivery-providers/:id/reject', rejectDeliveryProvider)
+
+export default router
