@@ -35,7 +35,7 @@ async function cacheSet(key, value, ttl) {
 }
 
 /** Invalidate all category cache keys (called on create/update/delete). */
-async function cacheClearCategories() {
+export async function cacheClearCategories() {
   try {
     // Delete the "all categories" key
     await redisClient.del(CACHE_KEY_ALL);
@@ -72,18 +72,23 @@ export const getAllCategories = async (req, res) => {
     }
 
     // 2. Cache miss → query DB
+    // Subcategories are hidden when their parent has been disabled by an admin.
     const categories = await prisma.category.findMany({
-      where: { status: 'active' },
+      where: {
+        status: 'active',
+        OR: [{ parentId: null }, { parent: { status: 'active' } }],
+      },
       include: {
         _count: { select: { listings: { where: { status: 'active' } } } },
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
 
     const data = categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
       icon: cat.icon,
+      parentId: cat.parentId,
       slug: nameToSlug(cat.name),
       listingCount: cat._count.listings,
       createdAt: cat.createdAt,

@@ -2,8 +2,6 @@ import express from 'express'
 
 import {
   getSalesReport,
-  getDisputes,
-  getAllOrders,
   getDeliveryProviders,
   approveDeliveryProvider,
   rejectDeliveryProvider,
@@ -19,9 +17,36 @@ import {
   approveSeller,
   rejectSeller,
   suspendSeller,
-} from '../controllers/Adminsellercontroller.js'
+} from '../controllers/adminSellerController.js'
 
-import { adminAuth } from '../middleware/Adminmiddleware.js'
+import {
+  getAdminCategories,
+  createAdminCategory,
+  updateAdminCategory,
+  setAdminCategoryStatus,
+} from '../controllers/adminCategoryController.js'
+
+import {
+  listAdminOrders,
+  getAdminOrderById,
+  overrideOrderStatus,
+  overridePaymentStatus,
+  assignOrderDelivery,
+  getSellerFilterOptions,
+  getBuyerFilterOptions,
+  getDeliveryProviderOptions,
+} from '../controllers/adminOrderController.js'
+
+import {
+  listDisputes,
+  getDisputeById,
+  openDispute,
+  updateDisputeStatus,
+  resolveDispute,
+} from '../controllers/adminDisputeController.js'
+
+import { uploadCategoryIcon } from '../middleware/categoryIconUpload.js'
+import { adminAuth } from '../middleware/adminMiddleware.js'
 
 const router = express.Router()
 
@@ -43,10 +68,31 @@ router.patch('/sellers/:id/approve', approveSeller)
 router.patch('/sellers/:id/reject', rejectSeller)
 router.patch('/sellers/:id/suspend', suspendSeller)
 
+/* Category management (JSON or multipart with optional `iconFile`) */
+router.get('/categories', getAdminCategories)
+router.post('/categories', uploadCategoryIcon, createAdminCategory)
+router.patch('/categories/:id/status', setAdminCategoryStatus) // keep above /categories/:id
+router.patch('/categories/:id', uploadCategoryIcon, updateAdminCategory)
+
+/* Order management — lookup routes must stay above /orders/:id */
+router.get('/orders', listAdminOrders)
+router.get('/orders/filters/sellers', getSellerFilterOptions)
+router.get('/orders/filters/buyers', getBuyerFilterOptions)
+router.get('/orders/filters/delivery-providers', getDeliveryProviderOptions)
+router.get('/orders/:id', getAdminOrderById)
+router.patch('/orders/:id/status', overrideOrderStatus)
+router.patch('/orders/:id/payment-status', overridePaymentStatus)
+router.post('/orders/:id/delivery', assignOrderDelivery)
+router.post('/orders/:id/disputes', openDispute)
+
+/* Dispute handling */
+router.get('/disputes', listDisputes)
+router.get('/disputes/:id', getDisputeById)
+router.patch('/disputes/:id/status', updateDisputeStatus)
+router.post('/disputes/:id/resolve', resolveDispute)
+
 /* Other admin features (unchanged) */
 router.get('/reports/sales', getSalesReport)
-router.get('/disputes', getDisputes)
-router.get('/orders', getAllOrders)
 
 router.get('/delivery-providers', getDeliveryProviders)
 router.put('/delivery-providers/:id/approve', approveDeliveryProvider)
