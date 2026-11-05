@@ -119,23 +119,24 @@ model Category {
 }
 
 model Listing {
-  id          Int              @id @default(autoincrement())
-  sellerId    Int
-  categoryId  Int
-  title       String
-  description String
-  type        String           @default("PRODUCT") // "PRODUCT" or "SERVICE"
-  status      String           @default("active") // "active", "paused", "draft"
-  sold        Int              @default(0)
+  id            Int              @id @default(autoincrement())
+  sellerId      Int
+  categoryId    Int
+  title         String
+  slug          String?          @unique
+  description   String
+  type          String           @default("PRODUCT")
+  status        String           @default("active")
+  sold          Int              @default(0)
   discountPrice Float?
   discountStart DateTime?
   discountEnd   DateTime?
-  seller      Seller           @relation(fields: [sellerId], references: [id])
-  category    Category         @relation(fields: [categoryId], references: [id])
-  variants    ProductVariant[]
-  reviews     Review[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  seller        Seller           @relation(fields: [sellerId], references: [id])
+  category      Category         @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  reviews       Review[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
 model ProductVariant {
@@ -399,11 +400,7 @@ model CategoryCommission {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  category Category @relation(
-    fields: [categoryId],
-    references: [id],
-    onDelete: Cascade
-  )
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
 model PlatformAnnouncement {
