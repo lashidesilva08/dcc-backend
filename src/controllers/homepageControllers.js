@@ -1,14 +1,50 @@
 import { prisma } from "../config/prisma.js";
+import { getPublicAnnouncements } from './adminAnnouncementController.js'
+
 export const getBanners = async (req, res) => {
-    try {
-        res.status(200).json({ 
-            banners: ["https://example.com/promo1.jpg", "https://example.com/promo2.jpg"],
-            message: "Active hero banners retrieved." 
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
+  try {
+    const now = new Date()
+
+    const banners = await prisma.platformAnnouncement.findMany({
+      where: {
+        type: {
+          in: ['banner', 'promotion'],
+        },
+        enabled: true,
+        AND: [
+          {
+            OR: [
+              { startsAt: null },
+              { startsAt: { lte: now } },
+            ],
+          },
+          {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: now } },
+            ],
+          },
+        ],
+      },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { createdAt: 'desc' },
+      ],
+    })
+
+    return res.json({
+      success: true,
+      banners,
+    })
+  } catch (error) {
+    console.error(error)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load homepage banners.',
+    })
+  }
+}
 
 
 export const updateHeroBanner = async (req, res) => {

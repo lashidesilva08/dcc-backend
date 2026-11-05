@@ -113,6 +113,7 @@ model Category {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @default(now()) @updatedAt
   listings    Listing[]
+  commission CategoryCommission?
 
   @@index([parentId])
 }
@@ -382,4 +383,44 @@ model OrderAdminLog {
   admin     User?    @relation(fields: [adminId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+}
+
+model PlatformSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model CategoryCommission {
+  id             Int      @id @default(autoincrement())
+  categoryId     Int      @unique
+  commissionRate Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  category Category @relation(
+    fields: [categoryId],
+    references: [id],
+    onDelete: Cascade
+  )
+}
+
+model PlatformAnnouncement {
+  id          String   @id @default(uuid())
+  title       String
+  subtitle    String?
+  description String?
+  type        String   @default("announcement")
+  imageUrl    String?
+  ctaLabel    String?
+  ctaTo       String?
+  enabled     Boolean  @default(true)
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([enabled, startsAt, expiresAt])
 }
