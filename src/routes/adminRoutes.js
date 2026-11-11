@@ -8,7 +8,7 @@ import {
 } from '../controllers/adminControllers.js'
 
 import { getAdminDashboard } from '../controllers/adminDashboardController.js'
-
+import adminPlatformSettingsRoutes from './adminPlatformSettingsRoutes.js'
 import {
   listSellers,
   getPendingSellers,
@@ -97,5 +97,7 @@ router.get('/reports/sales', getSalesReport)
 router.get('/delivery-providers', getDeliveryProviders)
 router.put('/delivery-providers/:id/approve', approveDeliveryProvider)
 router.put('/delivery-providers/:id/reject', rejectDeliveryProvider)
+
+router.use('/', adminPlatformSettingsRoutes)
 
 export default router
