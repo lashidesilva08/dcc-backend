@@ -1,7 +1,7 @@
 import express from 'express'
 
 import {
-  getDeliveryProviders,
+  
   approveDeliveryProvider,
   rejectDeliveryProvider,
 } from '../controllers/adminControllers.js'
