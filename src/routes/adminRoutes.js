@@ -1,7 +1,7 @@
 import express from 'express'
 
 import {
-  getSalesReport,
+  
   approveDeliveryProvider,
   rejectDeliveryProvider,
 } from '../controllers/adminControllers.js'
@@ -54,6 +54,13 @@ import {
   assignDelivery,
 } from '../controllers/adminDeliveryController.js'
 
+import {
+  getReportsAnalytics,
+  getTopProducts,
+  getTopSellers,
+  exportReportsCSV,
+} from '../controllers/adminReportsController.js'
+
 const router = express.Router()
 
 // Every route below requires a valid JWT and an admin role.
@@ -97,8 +104,22 @@ router.get('/disputes/:id', getDisputeById)
 router.patch('/disputes/:id/status', updateDisputeStatus)
 router.post('/disputes/:id/resolve', resolveDispute)
 
-/* Other admin features (unchanged) */
-router.get('/reports/sales', getSalesReport)
+/* Reports & Analytics */
+
+// Complete reports dashboard
+router.get('/reports/analytics', getReportsAnalytics)
+
+// Top-selling products
+router.get('/reports/top-products', getTopProducts)
+
+// Top-performing sellers
+router.get('/reports/top-sellers', getTopSellers)
+
+// Download sales report as CSV
+router.get('/reports/export.csv', exportReportsCSV)
+
+// Legacy endpoint — keep existing integrations working
+router.get('/reports/sales', getReportsAnalytics)
 
 /* --------------------------------------------------
    DELIVERY PROVIDER MANAGEMENT
