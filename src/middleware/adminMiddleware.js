@@ -15,6 +15,13 @@ export const requireAdmin = (req, res, next) => {
 
   const role = String(req.user.role || '').toUpperCase()
 
+  // Temporary debugging
+  console.log('[ADMIN AUTH CHECK]', {
+    userId: req.user.id,
+    role: req.user.role,
+    accepted: ADMIN_ROLES.includes(role),
+  })
+
   if (!ADMIN_ROLES.includes(role)) {
     return res.status(403).json({
       success: false,

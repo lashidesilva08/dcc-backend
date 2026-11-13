@@ -45,7 +45,7 @@ import {
 } from '../controllers/adminDisputeController.js'
 
 import { uploadCategoryIcon } from '../middleware/categoryIconUpload.js'
-import { adminAuth } from '../middleware/adminMiddleware.js'
+import { adminAuth } from '../middleware/Adminmiddleware.js'
 
 import {
   getDeliveryProviders,
