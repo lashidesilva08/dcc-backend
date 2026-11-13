@@ -2,7 +2,6 @@ import express from 'express'
 
 import {
   getSalesReport,
-  getDeliveryProviders,
   approveDeliveryProvider,
   rejectDeliveryProvider,
 } from '../controllers/adminControllers.js'
@@ -46,7 +45,14 @@ import {
 } from '../controllers/adminDisputeController.js'
 
 import { uploadCategoryIcon } from '../middleware/categoryIconUpload.js'
-import { adminAuth } from '../middleware/adminMiddleware.js'
+import { adminAuth } from '../middleware/Adminmiddleware.js'
+
+import {
+  getDeliveryProviders,
+  updateDeliveryProvider,
+  getUnassignedDeliveries,
+  assignDelivery,
+} from '../controllers/adminDeliveryController.js'
 
 const router = express.Router()
 
@@ -94,9 +100,33 @@ router.post('/disputes/:id/resolve', resolveDispute)
 /* Other admin features (unchanged) */
 router.get('/reports/sales', getSalesReport)
 
-router.get('/delivery-providers', getDeliveryProviders)
-router.put('/delivery-providers/:id/approve', approveDeliveryProvider)
-router.put('/delivery-providers/:id/reject', rejectDeliveryProvider)
+/* --------------------------------------------------
+   DELIVERY PROVIDER MANAGEMENT
+-------------------------------------------------- */
+
+router.get(
+  '/delivery-providers',
+  getDeliveryProviders
+)
+
+router.patch(
+  '/delivery-providers/:id',
+  updateDeliveryProvider
+)
+
+/* --------------------------------------------------
+   MANUAL DELIVERY ASSIGNMENT
+-------------------------------------------------- */
+
+router.get(
+  '/deliveries',
+  getUnassignedDeliveries
+)
+
+router.post(
+  '/deliveries/assign',
+  assignDelivery
+)
 
 router.use('/', adminPlatformSettingsRoutes)
 
