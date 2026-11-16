@@ -15,7 +15,7 @@ import {
   deleteAnnouncement,
 } from '../controllers/adminAnnouncementController.js'
 
-import { adminAuth } from '../middleware/adminMiddleware.js'
+import { adminAuth } from '../middleware/Adminmiddleware.js'
 import { uploadPlatformBanner } from '../middleware/platformBannerUpload.js'
 
 const router = express.Router()
