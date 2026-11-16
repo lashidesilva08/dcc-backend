@@ -1,11 +1,5 @@
 import express from 'express'
 
-import {
-  
-  approveDeliveryProvider,
-  rejectDeliveryProvider,
-} from '../controllers/adminControllers.js'
-
 import { getAdminDashboard } from '../controllers/adminDashboardController.js'
 import adminPlatformSettingsRoutes from './adminPlatformSettingsRoutes.js'
 import {
